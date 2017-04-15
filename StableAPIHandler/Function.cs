@@ -49,6 +49,17 @@ namespace StableAPIHandler {
 						Body = "What are you doing here?",
 						StatusCode = HttpStatusCode.OK
 					};
+				case "/status":
+					if(apigProxyEvent.HttpMethod == "GET") {
+						return new StableAPIResponse {
+							Body = JsonConvert.SerializeObject(enabled),
+							StatusCode = HttpStatusCode.OK
+						};
+					}
+					return new StableAPIResponse {
+						Body = "{}",
+						StatusCode = HttpStatusCode.NotFound
+					};
 
 				case "/dates":
 				case "/dates/":
