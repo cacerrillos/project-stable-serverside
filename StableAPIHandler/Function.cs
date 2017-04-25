@@ -592,6 +592,11 @@ namespace StableAPIHandler {
 				var req = JsonConvert.DeserializeObject<FinishSignupRequest>(apigProxyEvent.Body);
 				req.status = true;
 				try {
+					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1)
+						return new StableAPIResponse() {
+							Body = "{}",
+							StatusCode = HttpStatusCode.Unauthorized
+						};
 					List<Preference> toAdd = new List<Preference>();
 					for(int x = 0; x < req.data.Count; x++) {
 						toAdd.Add(new Preference() {
@@ -607,7 +612,7 @@ namespace StableAPIHandler {
 							}
 							ctx.SaveChanges();
 							tx.Commit();
-						} catch (DbUpdateException e) {
+						} catch(DbUpdateException e) {
 							tx.Rollback();
 							if(e.InnerException != null) {
 								if(e.InnerException.GetType() == typeof(MySqlException)) {
@@ -633,10 +638,9 @@ namespace StableAPIHandler {
 								Body = JsonConvert.SerializeObject(new Result(e)),
 								StatusCode = HttpStatusCode.InternalServerError
 							};
-							
+
 						}
 					}
-
 				} catch(Exception e) {
 					return new StableAPIResponse() {
 						Body = JsonConvert.SerializeObject(new Result(e)),

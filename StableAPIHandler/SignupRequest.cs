@@ -53,7 +53,7 @@ namespace StableAPIHandler {
 			get;
 			set;
 		}
-		public string Viewer_key {
+		public string viewer_key {
 			get;
 			set;
 		}
