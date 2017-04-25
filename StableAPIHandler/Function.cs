@@ -319,12 +319,27 @@ namespace StableAPIHandler {
 									return noSignups;
 								response = startSignup(apigProxyEvent, ctx);
 								break;
+							case "/register":
+							case "/register/":
+								if(!enabled)
+									return noSignups;
+								if(freeforall)
+									response = handleRegister(apigProxyEvent, ctx);
+								else
+									response = new StableAPIResponse() {
+										Body = "{}",
+										StatusCode = HttpStatusCode.Forbidden
+									};
+								break;
 
 							case "/signup/finish":
 							case "/signup/finish/":
 								if(!enabled)
 									return noSignups;
-								response = finishSignup(apigProxyEvent, ctx, context);
+								if(freeforall)
+									response = finishRegister(apigProxyEvent, ctx);
+								else
+									response = finishSignup(apigProxyEvent, ctx, context);
 								break;
 						}
 						#endregion
@@ -598,6 +613,7 @@ namespace StableAPIHandler {
 			try {
 				var req = JsonConvert.DeserializeObject<FinishSignupRequest>(apigProxyEvent.Body);
 				req.status = true;
+
 				try {
 					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1)
 						return new StableAPIResponse() {
@@ -724,6 +740,18 @@ namespace StableAPIHandler {
 			}
 
 
+			return new StableAPIResponse() {
+				Body = "",
+				StatusCode = HttpStatusCode.NotImplemented
+			};
+		}
+		private StableAPIResponse handleRegister(APIGatewayProxyRequest request, StableContext ctx) {
+			return new StableAPIResponse() {
+				Body = "",
+				StatusCode = HttpStatusCode.NotImplemented
+			};
+		}
+		private StableAPIResponse finishRegister(APIGatewayProxyRequest request, StableContext ctx) {
 			return new StableAPIResponse() {
 				Body = "",
 				StatusCode = HttpStatusCode.NotImplemented
