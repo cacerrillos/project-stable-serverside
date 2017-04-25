@@ -39,6 +39,13 @@ namespace StableAPIHandler {
 								};
 			bool enabled = bool.Parse(Environment.GetEnvironmentVariable("enabled"));
 
+			bool freeforall = false;
+			try {
+				freeforall = bool.Parse(Environment.GetEnvironmentVariable("freeforall"));
+			} catch(Exception e) {
+				Logger.LogLine("Warning! " + e.Message);
+			}
+
 
 
 			//Pre check the request path to save time
