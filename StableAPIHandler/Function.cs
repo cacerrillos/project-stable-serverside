@@ -90,6 +90,8 @@ namespace StableAPIHandler {
 
 				case "/signup":
 				case "/signup/":
+				case "/register":
+				case "/register/":
 					break;
 
 				case "/signup/finish":
@@ -460,10 +462,7 @@ namespace StableAPIHandler {
 
 			} catch(Exception e) {
 				Logger.LogLine(e.ToString());
-				return new StableAPIResponse() {
-					Body = JsonConvert.SerializeObject(new Result(e)),
-					StatusCode = HttpStatusCode.BadRequest
-				};
+				return StableAPIResponse.BadRequest(e);
 			}
 		}
 		private StableAPIResponse HandlePUT<E>(APIGatewayProxyRequest request, StableContext ctx) where E : class {
@@ -502,10 +501,7 @@ namespace StableAPIHandler {
 
 			} catch(Exception e) {
 				Logger.LogLine(e.ToString());
-				return new StableAPIResponse() {
-					Body = JsonConvert.SerializeObject(new Result(e)),
-					StatusCode = HttpStatusCode.BadRequest
-				};
+				return StableAPIResponse.BadRequest(e);
 			}
 		}
 		private StableAPIResponse HandleDELETE<E>(APIGatewayProxyRequest request, StableContext ctx) where E : class {
@@ -555,10 +551,7 @@ namespace StableAPIHandler {
 
 			} catch(Exception e) {
 				Logger.LogLine(e.ToString());
-				return new StableAPIResponse() {
-					Body = JsonConvert.SerializeObject(new Result(e)),
-					StatusCode = HttpStatusCode.BadRequest
-				};
+				return StableAPIResponse.BadRequest(e);
 			}
 		}
 		private StableAPIResponse startSignup(APIGatewayProxyRequest request, StableContext ctx) {
@@ -603,10 +596,7 @@ namespace StableAPIHandler {
 					};
 				}
 			} catch(Exception e) {
-				return new StableAPIResponse() {
-					Body = JsonConvert.SerializeObject(new Result(e)),
-					StatusCode = HttpStatusCode.BadRequest
-				};
+				return StableAPIResponse.BadRequest(e);
 			}
 		}
 		private StableAPIResponse finishSignup(APIGatewayProxyRequest apigProxyEvent, StableContext ctx, ILambdaContext context) {
@@ -676,10 +666,7 @@ namespace StableAPIHandler {
 					Body = JsonConvert.SerializeObject(req)
 				};
 			} catch(Exception e) {
-				return new StableAPIResponse() {
-					Body = JsonConvert.SerializeObject(new Result(e)),
-					StatusCode = HttpStatusCode.BadRequest
-				};
+				return StableAPIResponse.BadRequest(e);
 			}
 		}
 		private StableAPIResponse HandlePrint(APIGatewayProxyRequest request, StableContext ctx) {
@@ -689,10 +676,7 @@ namespace StableAPIHandler {
 				try {
 				pres_id = uint.Parse(request.QueryStringParameters["presentation_id"]);
 				} catch(Exception e) {
-					return new StableAPIResponse() {
-						Body = JsonConvert.SerializeObject(new Result(e)),
-						StatusCode = HttpStatusCode.BadRequest
-					};
+					return StableAPIResponse.BadRequest(e);
 				}
 				var presentation = ctx.presentations.First(thus => thus.presentation_id == pres_id);
 				var location = ctx.locations.First(thus => thus.location_id == presentation.location_id);
@@ -738,24 +722,83 @@ namespace StableAPIHandler {
 			} catch(Exception e) {
 				throw;
 			}
-
-
-			return new StableAPIResponse() {
-				Body = "",
-				StatusCode = HttpStatusCode.NotImplemented
-			};
 		}
 		private StableAPIResponse handleRegister(APIGatewayProxyRequest request, StableContext ctx) {
-			return new StableAPIResponse() {
-				Body = "",
-				StatusCode = HttpStatusCode.NotImplemented
-			};
+			try {
+				var req = JsonConvert.DeserializeObject<RegistrationRequest>(request.Body);
+				try {
+					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1) {
+						return StableAPIResponse.Unauthorized;
+					}
+
+					if(ctx.schedule.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id) != 1)
+						return StableAPIResponse.BadRequest(new Exception("Presentation instance not found!"));
+
+					//attempt to update presentations
+					try {
+						using(var tx = ctx.Database.BeginTransaction()) {
+							try {
+								int viewer_count = ctx.registrations.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id);
+								if(viewer_count < 9) {
+									ctx.registrations.Add(new Registration() {
+										date = req.date,
+										block_id = req.block_id,
+										presentation_id = req.presentation_id,
+										viewer_id = req.viewer_id
+									});
+
+								}
+
+								ctx.SaveChanges();
+								tx.Commit();
+								return StableAPIResponse.OK;
+								//todo details & full error
+							} catch(DbUpdateException e) {
+								tx.Rollback();
+								if(e.InnerException != null) {
+									if(e.InnerException.GetType() == typeof(MySqlException)) {
+										var me = e.InnerException as MySqlException;
+										return new StableAPIResponse() {
+											Body = JsonConvert.SerializeObject(new SignupErrorResponse(me.Number)),
+											StatusCode = HttpStatusCode.OK
+										};
+									}
+								}
+								return new StableAPIResponse() {
+									Body = JsonConvert.SerializeObject(e),
+									StatusCode = HttpStatusCode.InternalServerError
+								};
+							} catch(Exception e) {
+								tx.Rollback();
+								var expt = e;
+								while(expt != null) {
+									Logger.LogLine(expt.Message);
+									expt = expt.InnerException;
+								}
+								return new StableAPIResponse() {
+									Body = JsonConvert.SerializeObject(new Result(e)),
+									StatusCode = HttpStatusCode.InternalServerError
+								};
+
+							}
+
+						}
+					} catch(Exception e) {
+
+					}
+
+					return StableAPIResponse.OK;
+				} catch(Exception e) {
+					return StableAPIResponse.InternalServerError(e);
+				}
+			} catch (Exception e) {
+				Logger.LogLine(e.Message.ToString());
+				return StableAPIResponse.BadRequest(e);
+			}
+			return StableAPIResponse.NotImplemented;
 		}
 		private StableAPIResponse finishRegister(APIGatewayProxyRequest request, StableContext ctx) {
-			return new StableAPIResponse() {
-				Body = "",
-				StatusCode = HttpStatusCode.NotImplemented
-			};
+			return StableAPIResponse.NotImplemented;
 		}
 
 	}
@@ -767,11 +810,47 @@ namespace StableAPIHandler {
 		}
 		new public HttpStatusCode StatusCode {
 			get {
-				return (HttpStatusCode)StatusCode;
+				return (HttpStatusCode)base.StatusCode;
 			}
 			set {
 				base.StatusCode = (int)value;
 			}
+		}
+		public static StableAPIResponse OK {
+			get {
+				return new StableAPIResponse() {
+					Body = "{}",
+					StatusCode = HttpStatusCode.OK
+				};
+			}
+		}
+		public static StableAPIResponse NotImplemented {
+			get {
+				return new StableAPIResponse() {
+					Body = "{}",
+					StatusCode = HttpStatusCode.NotImplemented
+				};
+			}
+		}
+		public static StableAPIResponse Unauthorized {
+			get {
+				return new StableAPIResponse() {
+					Body = "{}",
+					StatusCode = HttpStatusCode.Unauthorized
+				};
+			}
+		}
+		public static StableAPIResponse BadRequest(Exception e) {
+			return new StableAPIResponse() {
+				StatusCode = HttpStatusCode.BadRequest,
+				Body = JsonConvert.SerializeObject(new Result(e))
+			};
+		}
+		public static StableAPIResponse InternalServerError(Exception e) {
+			return new StableAPIResponse() {
+				StatusCode = HttpStatusCode.InternalServerError,
+				Body = JsonConvert.SerializeObject(new Result(e))
+			};
 		}
 	}
 }

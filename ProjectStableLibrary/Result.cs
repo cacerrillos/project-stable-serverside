@@ -12,7 +12,10 @@ namespace ProjectStableLibrary {
 		}
 		public Result(Exception e) {
 			status = false;
-			details = e.InnerException != null ? e.InnerException.Message : e.Message;
+			if(e != null)
+				details = e.InnerException != null ? e.InnerException.Message : e.Message;
+			else
+				details = "{}";
 		}
 	}
 }

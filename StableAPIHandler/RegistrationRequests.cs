@@ -22,11 +22,15 @@ namespace StableAPIHandler {
 			get;
 			set;
 		}
-		public List<uint> data {
+		public uint date {
 			get;
 			set;
 		}
-		public bool status {
+		public uint block_id {
+			get;
+			set;
+		}
+		public uint presentation_id {
 			get;
 			set;
 		}
