@@ -38,5 +38,6 @@ namespace StableAPIHandler {
 	public class RegistrationResponse {
 		public bool status;
 		public List<ProjectStableLibrary.Registration> data;
+		public List<ProjectStableLibrary.Schedule> full;
 	}
 }

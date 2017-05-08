@@ -755,6 +755,8 @@ namespace StableAPIHandler {
 										}
 									}
 
+								} else {
+									throw new InvalidOperationException("Presentation is full!");
 								}
 
 								ctx.SaveChanges();
@@ -763,23 +765,31 @@ namespace StableAPIHandler {
 									StatusCode = HttpStatusCode.OK,
 									Body = JsonConvert.SerializeObject(new RegistrationResponse() {
 										status = true,
-										data = ctx.registrations.Where(thus => thus.viewer_id == req.viewer_id).ToList()
+										data = ctx.registrations.Where(thus => thus.viewer_id == req.viewer_id).ToList(),
+										full = ctx.FullPresentations
 									})
 								};
 								//todo details & full error
-							} catch(DbUpdateException e) {
+							} catch(Exception e) when (e is InvalidOperationException || e is DbUpdateException) {
 								tx.Rollback();
 								if(e.InnerException != null) {
 									if(e.InnerException.GetType() == typeof(MySqlException)) {
 										var me = e.InnerException as MySqlException;
 										return new StableAPIResponse() {
-											Body = JsonConvert.SerializeObject(new SignupErrorResponse(me.Number)),
+											Body = JsonConvert.SerializeObject(new SignupErrorResponse(me.Number) {
+												data = ctx.registrations.Where(thus => thus.viewer_id == req.viewer_id).ToList(),
+												full = ctx.FullPresentations
+											}),
 											StatusCode = HttpStatusCode.OK
 										};
 									}
 								}
 								return new StableAPIResponse() {
-									Body = JsonConvert.SerializeObject(e),
+									Body = JsonConvert.SerializeObject(new SignupErrorResponse() {
+										Message = e.Message,
+										data = ctx.registrations.Where(thus => thus.viewer_id == req.viewer_id).ToList(),
+										full = ctx.FullPresentations
+									}),
 									StatusCode = HttpStatusCode.InternalServerError
 								};
 							} catch(Exception e) {

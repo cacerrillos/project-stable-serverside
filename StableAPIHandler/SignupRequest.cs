@@ -35,6 +35,9 @@ namespace StableAPIHandler {
 		}
 	}
 	public class SignupErrorResponse {
+		public SignupErrorResponse() {
+			status = false;
+		}
 		public SignupErrorResponse(int code) {
 			this.status = false;
 			this.code = code;
@@ -47,6 +50,9 @@ namespace StableAPIHandler {
 			get;
 			set;
 		}
+		public string Message;
+		public List<ProjectStableLibrary.Registration> data;
+		public List<ProjectStableLibrary.Schedule> full;
 	}
 	public class FinishSignupRequest {
 		public uint viewer_id {

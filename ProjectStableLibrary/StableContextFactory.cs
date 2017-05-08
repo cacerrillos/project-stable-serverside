@@ -176,6 +176,19 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
+		public List<Schedule> FullPresentations {
+			get {
+				List<Schedule> full = new List<Schedule>();
+				var sche = this.Schedule;
+				foreach(var s in sche) {
+					if(registrations.Count(thus =>
+						thus.Schedule.Equals(s)) >= 10)
+						full.Add(s);
+				}
+
+				return full;
+			}
+		}
 
 	}
 	
