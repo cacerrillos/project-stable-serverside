@@ -739,13 +739,21 @@ namespace StableAPIHandler {
 						using(var tx = ctx.Database.BeginTransaction()) {
 							try {
 								int viewer_count = ctx.registrations.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id);
+								Registration existing = ctx.registrations.SingleOrDefault(thus => thus.date == req.date && thus.block_id == req.block_id && thus.viewer_id == req.viewer_id);
+
 								if(viewer_count < 9) {
-									ctx.registrations.Add(new Registration() {
-										date = req.date,
-										block_id = req.block_id,
-										presentation_id = req.presentation_id,
-										viewer_id = req.viewer_id
-									});
+									if(existing == null) {
+										ctx.registrations.Add(new Registration() {
+											date = req.date,
+											block_id = req.block_id,
+											presentation_id = req.presentation_id,
+											viewer_id = req.viewer_id
+										});
+									} else {
+										if(existing.presentation_id != req.presentation_id) {
+											existing.presentation_id = req.presentation_id;
+										}
+									}
 
 								}
 
