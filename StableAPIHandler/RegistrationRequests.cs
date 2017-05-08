@@ -36,7 +36,7 @@ namespace StableAPIHandler {
 		}
 	}
 	public class RegistrationResponse {
-		public List<uint> user = new List<uint>();
-		public Dictionary<uint, PresentationStats> presentations = new Dictionary<uint, PresentationStats>();
+		public bool status;
+		public List<ProjectStableLibrary.Registration> data;
 	}
 }

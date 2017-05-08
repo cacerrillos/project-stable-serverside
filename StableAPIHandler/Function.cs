@@ -759,7 +759,13 @@ namespace StableAPIHandler {
 
 								ctx.SaveChanges();
 								tx.Commit();
-								return StableAPIResponse.OK;
+								return new StableAPIResponse() {
+									StatusCode = HttpStatusCode.OK,
+									Body = JsonConvert.SerializeObject(new RegistrationResponse() {
+										status = true,
+										data = ctx.registrations.Where(thus => thus.viewer_id == req.viewer_id).ToList()
+									})
+								};
 								//todo details & full error
 							} catch(DbUpdateException e) {
 								tx.Rollback();
