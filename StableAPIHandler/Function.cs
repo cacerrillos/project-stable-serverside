@@ -86,6 +86,8 @@ namespace StableAPIHandler {
 				case "/schedule/":
 				case "/print":
 				case "/print/":
+				case "/full":
+				case "/full/":
 					break;
 
 				case "/signup":
@@ -277,7 +279,13 @@ namespace StableAPIHandler {
 							case "/print/":
 								response = HandlePrint(apigProxyEvent, ctx);
 								break;
-
+							case "/full":
+							case "/full/":
+								response = new StableAPIResponse() {
+									Body = JsonConvert.SerializeObject(ctx.FullPresentations),
+									StatusCode = HttpStatusCode.OK
+								};
+								break;
 							default:
 								break;
 						}
@@ -339,7 +347,7 @@ namespace StableAPIHandler {
 								if(!enabled)
 									return noSignups;
 								if(freeforall)
-									response = finishRegister(apigProxyEvent, ctx);
+									response = finishRegister(apigProxyEvent, ctx, context);
 								else
 									response = finishSignup(apigProxyEvent, ctx, context);
 								break;
@@ -833,12 +841,53 @@ namespace StableAPIHandler {
 				Logger.LogLine(e.Message.ToString());
 				return StableAPIResponse.BadRequest(e);
 			}
-			return StableAPIResponse.NotImplemented;
 		}
-		private StableAPIResponse finishRegister(APIGatewayProxyRequest request, StableContext ctx) {
-			return StableAPIResponse.NotImplemented;
-		}
+		private StableAPIResponse finishRegister(APIGatewayProxyRequest request, StableContext ctx, ILambdaContext context) {
+			try {
+				var req = JsonConvert.DeserializeObject<FinishSignupRequest>(request.Body);
+				req.status = true;
 
+				try {
+					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1)
+						return StableAPIResponse.Unauthorized;
+
+					using(var tx = ctx.Database.BeginTransaction()) {
+						try {
+							Viewer v = ctx.viewers.First(thus => thus.viewer_id == req.viewer_id && !thus.Saved());
+							v.saved = 1;
+							tx.Commit();
+							ctx.SaveChanges();
+						} catch(Exception e) {
+							tx.Rollback();
+							return new StableAPIResponse() {
+								StatusCode = HttpStatusCode.OK,
+								Body = JsonConvert.SerializeObject(new RegistrationResponse() {
+									status = false,
+									error = new ViewerSavedError() {
+										code = 103,
+										message = "Viewer already saved, no further changes are allowed."
+									}
+								})
+							};
+						}
+					}
+					
+
+				} catch(Exception e) {
+					return new StableAPIResponse() {
+						Body = JsonConvert.SerializeObject(new Result(e)),
+						StatusCode = HttpStatusCode.InternalServerError
+					};
+
+				}
+				return new StableAPIResponse() {
+					StatusCode = HttpStatusCode.OK,
+					Body = JsonConvert.SerializeObject(req)
+				};
+			} catch(Exception e) {
+				return StableAPIResponse.BadRequest(e);
+			}
+		}
 	}
 	public class StableAPIResponse : APIGatewayProxyResponse {
 		public StableAPIResponse() {
