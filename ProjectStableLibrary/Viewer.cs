@@ -39,12 +39,19 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
+		public byte saved {
+			get;
+			set;
+		}
 		// public virtual Grade Grade {
 		// 	get;
 		// 	set;
 		// }
 		public SanitizedViewer Sanitize() {
 			return new SanitizedViewer(this);
+		}
+		public bool Saved() {
+			return saved != 0;
 		}
 	}
 	public class SanitizedViewer {

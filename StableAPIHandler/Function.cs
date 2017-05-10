@@ -605,7 +605,7 @@ namespace StableAPIHandler {
 				req.status = true;
 
 				try {
-					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1)
+					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key && !thus.Saved()) != 1)
 						return new StableAPIResponse() {
 							Body = "{}",
 							StatusCode = HttpStatusCode.Unauthorized
@@ -623,6 +623,8 @@ namespace StableAPIHandler {
 							foreach(Preference p in toAdd) {
 								ctx.preferences.Add(p);
 							}
+							Viewer v = ctx.viewers.FirstOrDefault(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key);
+							v.saved = 1;
 							ctx.SaveChanges();
 							tx.Commit();
 						} catch(DbUpdateException e) {
@@ -729,6 +731,18 @@ namespace StableAPIHandler {
 				try {
 					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1) {
 						return StableAPIResponse.Unauthorized;
+					}
+					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.Saved()) == 1) {
+						return new StableAPIResponse() {
+							StatusCode = HttpStatusCode.OK,
+							Body = JsonConvert.SerializeObject(new RegistrationResponse() {
+								status = false,
+								error = new ViewerSavedError() {
+									code = 103,
+									message = "Viewer already saved, no further changes are allowed."
+								}
+							})
+						};
 					}
 
 					if(ctx.schedule.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id) != 1)

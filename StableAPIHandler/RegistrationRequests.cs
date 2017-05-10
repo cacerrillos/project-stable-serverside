@@ -39,5 +39,10 @@ namespace StableAPIHandler {
 		public bool status;
 		public List<ProjectStableLibrary.Registration> data;
 		public List<ProjectStableLibrary.Schedule> full;
+		public ViewerSavedError error = null;
+	}
+	public class ViewerSavedError {
+		public uint code = 0;
+		public string message = "";
 	}
 }
