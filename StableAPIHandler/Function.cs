@@ -33,10 +33,10 @@ namespace StableAPIHandler {
 			int resultCode = 405;
 
 			var noSignups = new APIGatewayProxyResponse() {
-									Body = "{}",
-									Headers = new Dictionary<string, string>() {{"access-control-allow-origin", Environment.GetEnvironmentVariable("SITE_DOMAIN")}},
-									StatusCode = 418
-								};
+				Body = "{}",
+				Headers = new Dictionary<string, string>() { { "access-control-allow-origin", Environment.GetEnvironmentVariable("SITE_DOMAIN") } },
+				StatusCode = 418
+			};
 			bool enabled = bool.Parse(Environment.GetEnvironmentVariable("enabled"));
 
 			bool freeforall = false;
@@ -49,7 +49,9 @@ namespace StableAPIHandler {
 
 
 			//Pre check the request path to save time
-
+			if(apigProxyEvent.Path.Contains("/api") && apigProxyEvent.Path.Length > 4) {
+				apigProxyEvent.Path = apigProxyEvent.Path.Substring(4, apigProxyEvent.Path.Length - 4);
+			}
 			switch(apigProxyEvent.Path.ToLower()) {
 				case "/":
 					return new StableAPIResponse {
@@ -240,14 +242,14 @@ namespace StableAPIHandler {
 										Body = JsonConvert.SerializeObject(ctx.GetPreferences(viewer_id)),
 										StatusCode = HttpStatusCode.OK
 									};
-								} catch (Exception e) {
+								} catch(Exception e) {
 									response = new StableAPIResponse() {
 										Body = JsonConvert.SerializeObject(new Result(e)),
 										StatusCode = HttpStatusCode.BadRequest
 									};
 								}
 								break;
-							
+
 							case "/schedule":
 							case "/schedule/":
 								if(apigProxyEvent.QueryStringParameters != null)
@@ -261,7 +263,7 @@ namespace StableAPIHandler {
 												StatusCode = HttpStatusCode.OK
 											};
 											break;
-										} catch (Exception e) {
+										} catch(Exception e) {
 											Logger.LogLine(e.ToString());
 											response = new StableAPIResponse() {
 												Body = JsonConvert.SerializeObject(new Result(e)),
@@ -435,7 +437,7 @@ namespace StableAPIHandler {
 
 		//You gotta love generic typing!! :D
 
-		private StableAPIResponse HandlePOST<E> (APIGatewayProxyRequest request, StableContext ctx) where E : class {
+		private StableAPIResponse HandlePOST<E>(APIGatewayProxyRequest request, StableContext ctx) where E : class {
 			try {
 				string adminCode = Environment.GetEnvironmentVariable("admin_code");
 				if(adminCode == null || adminCode == "")
@@ -544,9 +546,9 @@ namespace StableAPIHandler {
 						int status = ctx.SaveChanges();
 						tx.Commit();
 						return new StableAPIResponse() {
-								Body = JsonConvert.SerializeObject((status == 1)),
-								StatusCode = HttpStatusCode.OK
-							};
+							Body = JsonConvert.SerializeObject((status == 1)),
+							StatusCode = HttpStatusCode.OK
+						};
 					} catch(Exception e) {
 						tx.Rollback();
 						Logger.LogLine(e.ToString());
@@ -597,7 +599,7 @@ namespace StableAPIHandler {
 							};
 						}
 					}
-				} catch (Exception e) {
+				} catch(Exception e) {
 					return new StableAPIResponse() {
 						Body = JsonConvert.SerializeObject(new Result(e)),
 						StatusCode = HttpStatusCode.InternalServerError
@@ -669,7 +671,7 @@ namespace StableAPIHandler {
 						Body = JsonConvert.SerializeObject(new Result(e)),
 						StatusCode = HttpStatusCode.InternalServerError
 					};
-					
+
 				}
 				return new StableAPIResponse() {
 					StatusCode = HttpStatusCode.OK,
