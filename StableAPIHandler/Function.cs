@@ -680,14 +680,35 @@ namespace StableAPIHandler {
 			}
 		}
 		private StableAPIResponse HandlePrint(APIGatewayProxyRequest request, StableContext ctx) {
-
 			uint pres_id;
+
 			try {
-				try {
 				pres_id = uint.Parse(request.QueryStringParameters["presentation_id"]);
-				} catch(Exception e) {
-					return StableAPIResponse.BadRequest(e);
+				var res = new StableAPIResponse() {
+					Body = "",
+					StatusCode = HttpStatusCode.OK,
+
+				};
+				if(pres_id == 0) {
+					var p = ctx.Presentations;
+					foreach(var k in p) {
+						res.Body += PrintPres(k.Key, ctx);
+					}
+				} else {
+					res.Body = PrintPres(pres_id, ctx);
 				}
+
+				res.Headers.Add("Content-Type", "text/html; charset=utf-8");
+				return res;
+			} catch(Exception e) {
+				return new StableAPIResponse() {
+					Body = JsonConvert.SerializeObject(new Result(e)),
+					StatusCode = HttpStatusCode.BadRequest
+				};
+			}
+		}
+		private string PrintPres(uint pres_id, StableContext ctx) {
+			try {
 				var presentation = ctx.presentations.First(thus => thus.presentation_id == pres_id);
 				var location = ctx.locations.First(thus => thus.location_id == presentation.location_id);
 				var blocks = ctx.Blocks;
@@ -704,13 +725,12 @@ namespace StableAPIHandler {
 				var temp = ctx.registrations.Where(thus => thus.presentation_id == pres_id).ToList();
 
 				var viewers_in_pres = from thus in temp select thus.viewer_id;
-				
+
 				var viewers_with_data = ctx.viewers.Where(thus => viewers_in_pres.Contains(thus.viewer_id)).ToList();
 
 				foreach(Registration r in temp) {
 					viewers[r.Schedule].Add(viewers_with_data.First(thus => thus.viewer_id == r.viewer_id));
 				}
-
 
 				PrintOutput print = new PrintOutput() {
 					presentationData = presentation,
@@ -722,13 +742,7 @@ namespace StableAPIHandler {
 					viewers = viewers
 
 				};
-				var res = new StableAPIResponse() {
-					Body = print.ToString(),
-					StatusCode = HttpStatusCode.OK,
-					
-				};
-				res.Headers.Add("Content-Type", "text/html; charset=utf-8");
-				return res;
+				return print.ToString();
 			} catch(Exception e) {
 				throw;
 			}
