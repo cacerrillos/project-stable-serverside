@@ -27,6 +27,27 @@ namespace StableAPIHandler {
 		/// <returns></returns>
 		///
 		ILambdaLogger Logger;
+		public static string GetEnvironmentVariable(string variable) {
+			try {
+				string r = Environment.GetEnvironmentVariable(variable);
+				if(r == null)
+					throw new Exception();
+				return r;
+			} catch (Exception) {
+				switch(variable) {
+					case "enabled":
+						return "true";
+					case "freeforall":
+						return "true";
+					case "SITE_DOMAIN":
+						return "*";
+					case "admin_code":
+						return "admin_code";
+					default:
+						return "";
+				}
+			}
+		}
 		public APIGatewayProxyResponse FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context) {
 			Logger = context.Logger;
 			object resultObject = new object();
@@ -34,14 +55,14 @@ namespace StableAPIHandler {
 
 			var noSignups = new APIGatewayProxyResponse() {
 				Body = "{}",
-				Headers = new Dictionary<string, string>() { { "access-control-allow-origin", Environment.GetEnvironmentVariable("SITE_DOMAIN") } },
+				Headers = new Dictionary<string, string>() { { "access-control-allow-origin", GetEnvironmentVariable("SITE_DOMAIN") } },
 				StatusCode = 418
 			};
-			bool enabled = bool.Parse(Environment.GetEnvironmentVariable("enabled"));
+			bool enabled = bool.Parse(GetEnvironmentVariable("enabled"));
 
 			bool freeforall = false;
 			try {
-				freeforall = bool.Parse(Environment.GetEnvironmentVariable("freeforall"));
+				freeforall = bool.Parse(GetEnvironmentVariable("freeforall"));
 			} catch(Exception e) {
 				Logger.LogLine("Warning! " + e.Message);
 			}
@@ -119,11 +140,11 @@ namespace StableAPIHandler {
 			};
 
 			string conStr = new MySqlConnectionStringBuilder() {
-				Server = Environment.GetEnvironmentVariable("DB_ADDRESS"),
-				Port = uint.Parse(Environment.GetEnvironmentVariable("DB_PORT")),
-				UserID = Environment.GetEnvironmentVariable("DB_USER"),
-				Password = Environment.GetEnvironmentVariable("DB_PASSWORD"),
-				Database = Environment.GetEnvironmentVariable("DB_NAME"),
+				Server = GetEnvironmentVariable("DB_ADDRESS"),
+				Port = uint.Parse(GetEnvironmentVariable("DB_PORT")),
+				UserID = GetEnvironmentVariable("DB_USER"),
+				Password = GetEnvironmentVariable("DB_PASSWORD"),
+				Database = GetEnvironmentVariable("DB_NAME"),
 				SslMode = MySqlSslMode.Required
 			}.ToString();
 			using(StableContext ctx = StableContextFactory.Build(conStr)) {
@@ -439,7 +460,7 @@ namespace StableAPIHandler {
 
 		private StableAPIResponse HandlePOST<E>(APIGatewayProxyRequest request, StableContext ctx) where E : class {
 			try {
-				string adminCode = Environment.GetEnvironmentVariable("admin_code");
+				string adminCode = GetEnvironmentVariable("admin_code");
 				if(adminCode == null || adminCode == "")
 					throw new InvalidOperationException("admin_code not set on server");
 
@@ -477,7 +498,7 @@ namespace StableAPIHandler {
 		}
 		private StableAPIResponse HandlePUT<E>(APIGatewayProxyRequest request, StableContext ctx) where E : class {
 			try {
-				string adminCode = Environment.GetEnvironmentVariable("admin_code");
+				string adminCode = GetEnvironmentVariable("admin_code");
 				if(adminCode == null || adminCode == "")
 					throw new InvalidOperationException("admin_code not set on server");
 
@@ -516,7 +537,7 @@ namespace StableAPIHandler {
 		}
 		private StableAPIResponse HandleDELETE<E>(APIGatewayProxyRequest request, StableContext ctx) where E : class {
 			try {
-				string adminCode = Environment.GetEnvironmentVariable("admin_code");
+				string adminCode = GetEnvironmentVariable("admin_code");
 				if(adminCode == null || adminCode == "")
 					throw new InvalidOperationException("admin_code not set on server");
 
@@ -908,7 +929,7 @@ namespace StableAPIHandler {
 	public class StableAPIResponse : APIGatewayProxyResponse {
 		public StableAPIResponse() {
 			Headers = new Dictionary<string, string>() {
-				{ "access-control-allow-origin", Environment.GetEnvironmentVariable("SITE_DOMAIN") }
+				{ "access-control-allow-origin", Function.GetEnvironmentVariable("SITE_DOMAIN") }
 			};
 		}
 		new public HttpStatusCode StatusCode {
