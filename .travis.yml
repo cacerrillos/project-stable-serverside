@@ -9,3 +9,5 @@ before_script:
   - dotnet restore
 script:
   - dotnet build -c Release
+  - cd StableAPIHandler\ Tests
+  - dotnet test
