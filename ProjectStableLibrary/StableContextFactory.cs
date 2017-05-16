@@ -176,14 +176,23 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
-		public List<Schedule> FullPresentations {
+		public Dictionary<uint, List<Schedule>> FullPresentations {
 			get {
-				List<Schedule> full = new List<Schedule>();
-				var sche = this.Schedule;
-				foreach(var s in sche) {
-					if(registrations.Count(thus =>
-						thus.Schedule.Equals(s)) >= 10)
-						full.Add(s);
+				var full = new Dictionary<uint, List<Schedule>>();
+				var viewers = Viewers;
+				var grades = this.grades.ToList();
+				var sche = Schedule;
+				var reg = registrations.ToList();
+				
+				foreach(Grade g in grades) {
+					full.Add(g.grade_id, new List<Schedule>());
+					var viewerSubset = viewers.Where(thus => thus.Value.grade_id == g.grade_id);
+					foreach(var s in sche) {
+						int c = reg.Count(thus => thus.Schedule.Equals(s) && viewerSubset.Any(t => t.Value.viewer_id == thus.viewer_id));
+						if(c > 9) {
+							full[g.grade_id].Add(s);
+						}
+					}
 				}
 
 				return full;

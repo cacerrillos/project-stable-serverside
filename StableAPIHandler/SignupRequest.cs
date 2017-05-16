@@ -56,7 +56,7 @@ namespace StableAPIHandler {
 		}
 		public string Message;
 		public List<ProjectStableLibrary.Registration> data;
-		public List<ProjectStableLibrary.Schedule> full;
+		public Dictionary<uint, List<ProjectStableLibrary.Schedule>> full;
 	}
 	public class FinishSignupRequest {
 		public uint viewer_id {

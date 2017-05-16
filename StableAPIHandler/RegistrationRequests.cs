@@ -38,7 +38,7 @@ namespace StableAPIHandler {
 	public class RegistrationResponse {
 		public bool status;
 		public List<ProjectStableLibrary.Registration> data;
-		public List<ProjectStableLibrary.Schedule> full;
+		public Dictionary<uint, List<ProjectStableLibrary.Schedule>> full;
 		public ViewerSavedError error = null;
 	}
 	public class ViewerSavedError {
