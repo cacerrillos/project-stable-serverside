@@ -26,15 +26,12 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
-		[NotMapped]
-		public Schedule Schedule {
-			get {
-				return new Schedule() {
-					date = date,
-					block_id = block_id,
-					presentation_id = presentation_id
-				};
-			}
+		public Schedule Schedule() {
+			return new Schedule() {
+				date = date,
+				block_id = block_id,
+				presentation_id = presentation_id
+			};
 		}
 	}
 }

@@ -778,7 +778,7 @@ namespace StableAPIHandler {
 				var viewers_with_data = ctx.viewers.Where(thus => viewers_in_pres.Contains(thus.viewer_id)).ToList();
 
 				foreach(Registration r in temp) {
-					viewers[r.Schedule].Add(viewers_with_data.First(thus => thus.viewer_id == r.viewer_id));
+					viewers[r.Schedule()].Add(viewers_with_data.First(thus => thus.viewer_id == r.viewer_id));
 				}
 
 				PrintOutput print = new PrintOutput() {
