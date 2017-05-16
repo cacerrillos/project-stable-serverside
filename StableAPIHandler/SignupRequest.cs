@@ -19,6 +19,10 @@ namespace StableAPIHandler {
 			get;
 			set;
 		}
+		public int reserved {
+			get;
+			set;
+		}
 	}
 	public class SignupResponse : ProjectStableLibrary.Viewer {
 		public SignupResponse(ProjectStableLibrary.Viewer v) {

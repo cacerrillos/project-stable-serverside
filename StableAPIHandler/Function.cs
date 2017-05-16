@@ -606,11 +606,29 @@ namespace StableAPIHandler {
 						house_id = sr.house,
 						viewer_key = Guid.NewGuid().ToString().Substring(0, 16)
 					};
+					Presentation p = null;
+					if(sr.reserved != -1 && sr.grade == 4)
+						p = ctx.presentations.First(thus => thus.presentation_id == sr.reserved);
+
 
 					using(var tx = ctx.Database.BeginTransaction()) {
 						try {
 							ctx.viewers.Add(v);
 							ctx.SaveChanges();
+							if(p != null) {
+								try {
+									ctx.registrations.Add(new Registration() {
+										date = p.date,
+										block_id = p.block_id,
+										presentation_id = p.presentation_id,
+										viewer_id = v.viewer_id
+									});
+									ctx.SaveChanges();
+								} catch {
+									throw new Exception("Failed to register reserved spot!");
+								}
+							}
+							
 							tx.Commit();
 
 							return new StableAPIResponse() {
@@ -801,11 +819,16 @@ namespace StableAPIHandler {
 					if(ctx.schedule.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id) != 1)
 						return StableAPIResponse.BadRequest(new Exception("Presentation instance not found!"));
 
+					var v = ctx.viewers.First(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key);
+
 					//attempt to update presentations
 					try {
 						using(var tx = ctx.Database.BeginTransaction()) {
 							try {
-								int viewer_count = ctx.registrations.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id);
+								var reg = ctx.registrations.Where(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id).ToList();
+
+								int viewer_count = ctx.viewers.Count(thus => thus.grade_id == v.grade_id && reg.Exists(t => t.viewer_id == thus.viewer_id));
+								//int viewer_count = ctx.registrations.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id);
 								Registration existing = ctx.registrations.SingleOrDefault(thus => thus.date == req.date && thus.block_id == req.block_id && thus.viewer_id == req.viewer_id);
 
 								if(viewer_count < 9) {
