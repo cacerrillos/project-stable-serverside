@@ -26,6 +26,7 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
+		[NotMapped]
 		public Schedule Schedule {
 			get {
 				return new Schedule() {

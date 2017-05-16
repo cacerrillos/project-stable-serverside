@@ -37,6 +37,7 @@ namespace ProjectStableLibrary {
 					c.block_id,
 					c.viewer_id
 				});
+			modelBuilder.Entity<Registration>().Ignore(thus => thus.Schedule);
 		}
 
 		public DbSet<Date> dates {
@@ -171,7 +172,6 @@ namespace ProjectStableLibrary {
 				return set.ToList();
 			}
 		}
-
 		public DbSet<Registration> registrations {
 			get;
 			set;
@@ -198,7 +198,5 @@ namespace ProjectStableLibrary {
 				return full;
 			}
 		}
-
 	}
-	
 }
