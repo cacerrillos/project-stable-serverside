@@ -48,6 +48,14 @@ namespace StableAPIHandler {
 				}
 			}
 		}
+		public APIGatewayProxyResponse TryFunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context) {
+			try {
+				return FunctionHandler(apigProxyEvent, context);
+			} catch(Exception e) {
+				context.Logger.LogLine(e.Message);
+				return StableAPIResponse.InternalServerError(e);
+			}
+		}
 		public APIGatewayProxyResponse FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context) {
 			Logger = context.Logger;
 			object resultObject = new object();
