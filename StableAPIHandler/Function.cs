@@ -52,7 +52,7 @@ namespace StableAPIHandler {
 			try {
 				return FunctionHandler(apigProxyEvent, context);
 			} catch(Exception e) {
-				context.Logger.LogLine(e.Message);
+				context.Logger.LogLine(e.Message + Environment.NewLine + e.StackTrace);
 				return StableAPIResponse.InternalServerError(e);
 			}
 		}

@@ -10,12 +10,19 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
+		public string trace {
+			get;
+			set;
+		}
 		public Result(Exception e) {
 			status = false;
-			if(e != null)
+			if(e != null) {
 				details = e.InnerException != null ? e.InnerException.Message : e.Message;
-			else
+				trace = e.StackTrace;
+			} else {
 				details = "{}";
+				trace = null;
+			}
 		}
 	}
 }
