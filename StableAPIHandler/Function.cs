@@ -950,14 +950,17 @@ namespace StableAPIHandler {
 			//check the count if not ignoring
 			long count = 0;
 			if(!ignoreFull) {
-				q = "SELECT COUNT(*) FROM `registrations` WHERE `date`=@date AND `block_id`=@block_id AND `presentation_id`=@presentation_id;";
+				q = "SELECT COUNT(`viewers`.`grade_id`) FROM `registrations` JOIN `viewers` ON `viewers`.`viewer_id` = `registrations`.`viewer_id` WHERE "
+					+ " `registrations`.`date`=@date AND `registrations`.`block_id`=@block_id AND `registrations`.`presentation_id`=@presentation_id AND `viewers`.`grade_id`=@g_id;";
 				using(var cmd = new MySqlCommand(q, dbCon, tx)) {
 					cmd.Prepare();
 					cmd.Parameters.AddWithValue("@date", req.date);
 					cmd.Parameters.AddWithValue("@block_id", req.block_id);
 					cmd.Parameters.AddWithValue("@presentation_id", req.presentation_id);
+					cmd.Parameters.AddWithValue("@g_id", v.grade_id);
 					count = (long)cmd.ExecuteScalar();
 				}
+				Logger.LogLine("Count by g: " + count);
 				if(count >= 9) {
 					throw new InvalidOperationException("Presentation is full!");
 				}
