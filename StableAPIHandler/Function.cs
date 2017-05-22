@@ -927,7 +927,27 @@ namespace StableAPIHandler {
 
 			int viewer_count = ctx.viewers.AsNoTracking().Count(thus => thus.grade_id == v.grade_id && reg.Exists(t => t.viewer_id == thus.viewer_id));
 			//int viewer_count = ctx.registrations.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id);
-			Registration existing = ctx.registrations.FirstOrDefault(thus => thus.date == req.date && thus.block_id == req.block_id && thus.viewer_id == req.viewer_id);
+
+			var existing = ctx.registrations.FirstOrDefault(thus => thus.date == req.date && thus.block_id == req.block_id && thus.viewer_id == req.viewer_id);
+			if(existing != null) {
+				var cm = ctx.CoRequisiteMembers.AsNoTracking().FirstOrDefault(thus => thus.p_id == existing.presentation_id); //registrations to remove
+				if(cm != null) {
+					var registrationsToRemove = ctx.CoRequisiteMembers.AsNoTracking().Where(thus => thus.group_id == cm.group_id && thus.p_id != existing.presentation_id).ToList();
+					Logger.LogLine($"Found regis {string.Join(", ", registrationsToRemove.Select(thus => thus.p_id))}");
+
+					if(registrationsToRemove.Count > 0) {
+						//ughly hack
+						ctx.Database.ExecuteSqlCommand($"DELETE FROM `registrations` WHERE `viewer_id` = @viewer_id AND `presentation_id` IN ({string.Join(",", registrationsToRemove.Select(thus => thus.p_id))});",
+							new[] { new MySqlParameter("@viewer_id", v.viewer_id) });
+
+						ctx.SaveChanges();
+					}
+				}
+			}
+			
+
+			//var existing = ctx.registrations.FirstOrDefault(thus => thus.date == req.date && thus.block_id == req.block_id && thus.viewer_id == req.viewer_id);
+			Logger.LogLine($"Exists: {existing != null}");
 
 			if(viewer_count < 9 || ignoreFull) {
 				if(existing == null) {
@@ -940,6 +960,8 @@ namespace StableAPIHandler {
 				} else {
 					if(existing.presentation_id != req.presentation_id) {
 						//check if this was a coreq, if so, unregister from the other coreqs
+						
+
 						existing.presentation_id = req.presentation_id;
 					}
 				}
