@@ -791,13 +791,13 @@ namespace StableAPIHandler {
 				}
 
 				var temp = ctx.registrations.Where(thus => thus.presentation_id == pres_id).ToList();
+				if(temp.Count > 0) {
+					var viewers_in_pres = from thus in temp select thus.viewer_id;
 
-				var viewers_in_pres = from thus in temp select thus.viewer_id;
-
-				var viewers_with_data = ctx.viewers.Where(thus => viewers_in_pres.Contains(thus.viewer_id)).ToList();
-
-				foreach(Registration r in temp) {
-					viewers[r.Schedule()].Add(viewers_with_data.First(thus => thus.viewer_id == r.viewer_id));
+					var viewers_with_data = ctx.viewers.Where(thus => viewers_in_pres.Contains(thus.viewer_id)).ToList();
+					foreach(Registration r in temp) {
+						viewers[r.Schedule()].Add(viewers_with_data.First(thus => thus.viewer_id == r.viewer_id));
+					}
 				}
 
 				PrintOutput print = new PrintOutput() {

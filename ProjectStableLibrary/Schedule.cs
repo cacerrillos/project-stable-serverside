@@ -34,7 +34,23 @@ namespace ProjectStableLibrary {
 		}
 
 		public override int GetHashCode() {
-			return (date + "_" + block_id + "_" + presentation_id).GetHashCode();
+			unchecked {
+				int result = 37;
+
+				result *= 397;
+				result += date.GetHashCode();
+
+				result *= 397;
+				result += block_id.GetHashCode();
+
+				result *= 397;
+				result += presentation_id.GetHashCode();
+
+				return result;
+			}
+		}
+		public override string ToString() {
+			return date + "_" + block_id + "_" + presentation_id;
 		}
 	}
 }

@@ -37,8 +37,8 @@ namespace StableAPIHandler {
 			response += "<style>@media print { .break {page-break-after: always;}} td { padding-right: 2em; }</style>";
 
 			foreach(Schedule s in schedule) {
-				// if(!viewers.ContainsKey(s))
-				// 	continue;
+				if(!viewers.ContainsKey(s))
+					continue;
 
 				response += "<h4>" + presentationData.ToString() + " | " + locationData.location_name + " | " + blocks[s.block_id].block_name + "</h4>";
 				response += $"<div>Viewer count: <b>{viewers[s].Count}</b></div>";
