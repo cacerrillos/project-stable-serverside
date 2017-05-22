@@ -630,22 +630,25 @@ namespace StableAPIHandler {
 						try {
 							ctx.viewers.Add(v);
 							ctx.SaveChanges();
+							tx.Commit();
 							if(p != null) {
-								using(var dbCon = new MySqlConnection(conStr)) {
-									dbCon.Open();
-									Register(dbCon, v, new RegistrationRequest() {
-										date = p.date,
-										block_id = p.block_id,
-										presentation_id = p.presentation_id,
-										viewer_id = v.viewer_id,
-										viewer_key = v.viewer_key
-									}, true);
+								try {
+									using(var dbCon = new MySqlConnection(conStr)) {
+										dbCon.Open();
+										Register(dbCon, v, new RegistrationRequest() {
+											date = p.date,
+											block_id = p.block_id,
+											presentation_id = p.presentation_id,
+											viewer_id = v.viewer_id,
+											viewer_key = v.viewer_key
+										}, true);
+									}
+								} catch(Exception e) {
+									Logger.LogLine(str(StableAPIResponse.InternalServerError(e)));
 								}
-								
-								ctx.SaveChanges();
 							}
 
-							tx.Commit();
+							
 
 							return new StableAPIResponse() {
 								Body = JsonConvert.SerializeObject(new SignupResponse(v) {
