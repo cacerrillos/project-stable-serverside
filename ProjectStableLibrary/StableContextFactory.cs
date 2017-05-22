@@ -37,6 +37,24 @@ namespace ProjectStableLibrary {
 					c.block_id,
 					c.viewer_id
 				});
+
+			modelBuilder.Entity<CoRequisiteGroup>()
+				.ToTable("corequisite_groups");
+
+			modelBuilder.Entity<CoRequisiteMember>()
+				.ToTable("corequisite_members");
+
+			modelBuilder.Entity<CoRequisiteMember>()
+				.HasKey(c => new {
+					c.group_id,
+					c.p_id
+				});
+
+			modelBuilder.Entity<CoRequisiteMember>()
+				.HasOne(thus => thus.Group)
+				.WithMany(thus => thus.Members);
+			
+
 		}
 
 		public DbSet<Date> dates {
@@ -196,6 +214,14 @@ namespace ProjectStableLibrary {
 
 				return full;
 			}
+		}
+		public DbSet<CoRequisiteGroup> CoRequisiteGroups {
+			get;
+			set;
+		}
+		public DbSet<CoRequisiteMember> CoRequisiteMembers {
+			get;
+			set;
 		}
 	}
 }
