@@ -201,7 +201,7 @@ namespace ProjectStableLibrary {
 					var viewerSubset = viewers.Where(thus => thus.Value.grade_id == g.grade_id);
 					foreach(var s in sche) {
 						int c = reg.Count(thus => thus.Schedule().Equals(s) && viewerSubset.Any(t => t.Value.viewer_id == thus.viewer_id));
-						if(c > 9) {
+						if(c > 8) {
 							full[g.grade_id].Add(s);
 						}
 					}
