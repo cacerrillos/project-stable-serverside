@@ -12,9 +12,5 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
-		public ICollection<CoRequisiteMember> Members {
-			get;
-			set;
-		}
 	}
 }

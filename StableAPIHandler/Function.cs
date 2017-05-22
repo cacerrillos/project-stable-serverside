@@ -907,6 +907,22 @@ namespace StableAPIHandler {
 				Logger.LogLine("Bad registration auth: " + req.ToString());
 				throw e;
 			}
+
+			var cm = ctx.CoRequisiteMembers.AsNoTracking().FirstOrDefault(thus => thus.p_id == req.presentation_id);
+			if(cm != null) {
+				var coreqs = ctx.CoRequisiteMembers.AsNoTracking().Where(thus => thus.group_id == cm.group_id).ToList();
+				foreach(var c in coreqs) {
+					RegisterInternal(ctx, v, RegistrationRequest.FromPresentation(ctx, c.p_id, req.viewer_id, req.viewer_key), ignoreFull);
+					ctx.SaveChanges();
+				}
+			} else {
+				RegisterInternal(ctx, v, req, ignoreFull);
+			}
+
+
+			
+		}
+		private void RegisterInternal(StableContext ctx, Viewer v, RegistrationRequest req, bool ignoreFull) {
 			var reg = ctx.registrations.AsNoTracking().Where(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id).ToList();
 
 			int viewer_count = ctx.viewers.AsNoTracking().Count(thus => thus.grade_id == v.grade_id && reg.Exists(t => t.viewer_id == thus.viewer_id));
@@ -923,6 +939,7 @@ namespace StableAPIHandler {
 					});
 				} else {
 					if(existing.presentation_id != req.presentation_id) {
+						//check if this was a coreq, if so, unregister from the other coreqs
 						existing.presentation_id = req.presentation_id;
 					}
 				}

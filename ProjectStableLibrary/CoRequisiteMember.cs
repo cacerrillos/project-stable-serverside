@@ -11,15 +11,7 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
-		public virtual CoRequisiteGroup Group {
-			get;
-			set;
-		}
 		public uint p_id {
-			get;
-			set;
-		}
-		public virtual Presentation Presentation {
 			get;
 			set;
 		}

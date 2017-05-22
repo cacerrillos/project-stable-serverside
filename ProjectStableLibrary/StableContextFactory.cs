@@ -50,11 +50,6 @@ namespace ProjectStableLibrary {
 					c.p_id
 				});
 
-			modelBuilder.Entity<CoRequisiteMember>()
-				.HasOne(thus => thus.Group)
-				.WithMany(thus => thus.Members);
-			
-
 		}
 
 		public DbSet<Date> dates {
