@@ -45,7 +45,7 @@ namespace ProjectStableLibrary {
 		}
 		public List<Date> Dates {
 			get {
-				return dates.ToList();
+				return dates.AsNoTracking().ToList();
 			}
 		}
 		public DbSet<Block> blocks {
@@ -55,7 +55,7 @@ namespace ProjectStableLibrary {
 		public Dictionary<uint, Block> Blocks {
 			get {
 				Dictionary<uint, Block> blocks = new Dictionary<uint, Block>();
-				foreach(Block b in this.blocks) {
+				foreach(Block b in this.blocks.AsNoTracking()) {
 					blocks.Add(b.block_id, b);
 				}
 
@@ -69,7 +69,7 @@ namespace ProjectStableLibrary {
 		public Dictionary<uint, Grade> Grades {
 			get {
 				Dictionary<uint, Grade> grades = new Dictionary<uint, Grade>();
-				foreach(Grade g in this.grades) {
+				foreach(Grade g in this.grades.AsNoTracking()) {
 					grades.Add(g.grade_id, g);
 				}
 
@@ -83,7 +83,7 @@ namespace ProjectStableLibrary {
 		public Dictionary<uint, House> Houses {
 			get {
 				Dictionary<uint, House> houses = new Dictionary<uint, House>();
-				foreach(House h in this.houses) {
+				foreach(House h in this.houses.AsNoTracking()) {
 					houses.Add(h.house_id, h);
 				}
 
@@ -97,7 +97,7 @@ namespace ProjectStableLibrary {
 		public Dictionary<uint, Location> Locations {
 			get {
 				Dictionary<uint, Location> locations = new Dictionary<uint, Location>();
-				foreach(Location l in this.locations) {
+				foreach(Location l in this.locations.AsNoTracking()) {
 					locations.Add(l.location_id, l);
 				}
 
@@ -111,7 +111,7 @@ namespace ProjectStableLibrary {
 		public Dictionary<uint, Presentation> Presentations {
 			get {
 				Dictionary<uint, Presentation> presentations = new Dictionary<uint, Presentation>();
-				foreach(Presentation p in this.presentations) {
+				foreach(Presentation p in this.presentations.AsNoTracking()) {
 					presentations.Add(p.presentation_id, p);
 				}
 
@@ -125,7 +125,7 @@ namespace ProjectStableLibrary {
 		public Dictionary<uint, SanitizedViewer> Viewers {
 			get {
 				Dictionary<uint, SanitizedViewer> viewers = new Dictionary<uint, SanitizedViewer>();
-				foreach(Viewer v in this.viewers) {
+				foreach(Viewer v in this.viewers.AsNoTracking()) {
 					viewers.Add(v.viewer_id, v.Sanitize());
 				}
 
@@ -138,8 +138,8 @@ namespace ProjectStableLibrary {
 		}
 		public Dictionary<uint, Dictionary<uint, List<uint>>> GetPreferences(uint viewer_id) {
 			var data = new Dictionary<uint, Dictionary<uint, List<uint>>>();
-			var fetchedDates = dates.ToList();
-			var fetchedBlocks = blocks.ToList();
+			var fetchedDates = dates.AsNoTracking().ToList();
+			var fetchedBlocks = blocks.AsNoTracking().ToList();
 			foreach(Date date in fetchedDates) {
 				foreach(Block block in fetchedBlocks) {
 					if(!data.ContainsKey(date.date))
@@ -152,7 +152,7 @@ namespace ProjectStableLibrary {
 			return data;
 		}
 		public List<uint> GetPreferences(uint viewer_id, uint date, uint block_id) {
-			var subset = from thus in preferences
+			var subset = from thus in preferences.AsNoTracking()
 						 where thus.viewer_id == viewer_id
 						 orderby thus.order
 						 select thus.presentation_id;
@@ -165,7 +165,7 @@ namespace ProjectStableLibrary {
 		}
 		public List<Schedule> Schedule {
 			get {
-				var set  = from thus in schedule
+				var set  = from thus in schedule.AsNoTracking()
 							orderby thus.date, thus.block_id select thus;
 				
 				return set.ToList();
@@ -179,11 +179,11 @@ namespace ProjectStableLibrary {
 			get {
 				var full = new Dictionary<uint, List<Schedule>>();
 				var viewers = Viewers;
-				var grades = this.grades.ToList();
+				var grades = this.grades.AsNoTracking().ToList();
 				var sche = Schedule;
-				var reg = registrations.ToList();
+				var reg = registrations.AsNoTracking().ToList();
 				
-				foreach(Grade g in grades) {
+				foreach(Grade g in grades.AsEnumerable()) {
 					full.Add(g.grade_id, new List<Schedule>());
 					var viewerSubset = viewers.Where(thus => thus.Value.grade_id == g.grade_id);
 					foreach(var s in sche) {

@@ -236,8 +236,8 @@ namespace StableAPIHandler {
 											uint block_id = uint.Parse(apigProxyEvent.QueryStringParameters["block_id"]);
 											uint presentation_id = uint.Parse(apigProxyEvent.QueryStringParameters["presentation_id"]);
 
-											var regs = ctx.registrations.Where(thus => thus.date == date && thus.block_id == block_id && thus.presentation_id == presentation_id).ToList();
-											var viewers = ctx.viewers.ToList();
+											var regs = ctx.registrations.AsNoTracking().Where(thus => thus.date == date && thus.block_id == block_id && thus.presentation_id == presentation_id).ToList();
+											var viewers = ctx.viewers.AsNoTracking().ToList();
 											var result = new List<SanitizedViewer>();
 											foreach(var r in regs) {
 												result.Add(viewers.Find(thus => thus.viewer_id == r.viewer_id).Sanitize());
@@ -258,7 +258,7 @@ namespace StableAPIHandler {
 										try {
 											uint viewer_id = uint.Parse(apigProxyEvent.QueryStringParameters["viewer_id"]);
 											response = new StableAPIResponse() {
-												Body = JsonConvert.SerializeObject(ctx.viewers.First(thus => thus.viewer_id == viewer_id)),
+												Body = JsonConvert.SerializeObject(ctx.viewers.AsNoTracking().First(thus => thus.viewer_id == viewer_id)),
 												StatusCode = HttpStatusCode.OK
 											};
 										} catch(Exception e) {
@@ -300,7 +300,7 @@ namespace StableAPIHandler {
 										try {
 											uint viewer_id = uint.Parse(apigProxyEvent.QueryStringParameters["viewer_id"]);
 
-											var regs = ctx.registrations.Where(thus => thus.viewer_id == viewer_id).ToList();
+											var regs = ctx.registrations.AsNoTracking().Where(thus => thus.viewer_id == viewer_id).ToList();
 											response = new StableAPIResponse() {
 												Body = JsonConvert.SerializeObject(regs),
 												StatusCode = HttpStatusCode.OK
@@ -622,7 +622,7 @@ namespace StableAPIHandler {
 					};
 					Presentation p = null;
 					if(sr.reserved != -1 && sr.grade == 4)
-						p = ctx.presentations.First(thus => thus.presentation_id == sr.reserved);
+						p = ctx.presentations.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == sr.reserved);
 
 
 					using(var tx = ctx.Database.BeginTransaction()) {
@@ -630,17 +630,14 @@ namespace StableAPIHandler {
 							ctx.viewers.Add(v);
 							ctx.SaveChanges();
 							if(p != null) {
-								try {
-									ctx.registrations.Add(new Registration() {
-										date = p.date,
-										block_id = p.block_id,
-										presentation_id = p.presentation_id,
-										viewer_id = v.viewer_id
-									});
-									ctx.SaveChanges();
-								} catch {
-									throw new Exception("Failed to register reserved spot!");
-								}
+								Register(ctx, new RegistrationRequest() {
+									date = p.date,
+									block_id = p.block_id,
+									presentation_id = p.presentation_id,
+									viewer_id = v.viewer_id,
+									viewer_key = v.viewer_key
+								}, true);
+								ctx.SaveChanges();
 							}
 							
 							tx.Commit();
@@ -676,7 +673,7 @@ namespace StableAPIHandler {
 				req.status = true;
 
 				try {
-					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key && !thus.Saved()) != 1)
+					if(ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key && !thus.Saved()) != 1)
 						return new StableAPIResponse() {
 							Body = "{}",
 							StatusCode = HttpStatusCode.Unauthorized
@@ -814,10 +811,10 @@ namespace StableAPIHandler {
 			try {
 				var req = JsonConvert.DeserializeObject<RegistrationRequest>(request.Body);
 				try {
-					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1) {
+					if(ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1) {
 						return StableAPIResponse.Unauthorized;
 					}
-					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.Saved()) == 1) {
+					if(ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.Saved()) == 1) {
 						return new StableAPIResponse() {
 							StatusCode = HttpStatusCode.OK,
 							Body = JsonConvert.SerializeObject(new RegistrationResponse() {
@@ -830,38 +827,14 @@ namespace StableAPIHandler {
 						};
 					}
 
-					if(ctx.schedule.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id) != 1)
+					if(ctx.schedule.AsNoTracking().Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id) != 1)
 						return StableAPIResponse.BadRequest(new Exception("Presentation instance not found!"));
-
-					var v = ctx.viewers.First(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key);
 
 					//attempt to update presentations
 					try {
 						using(var tx = ctx.Database.BeginTransaction()) {
 							try {
-								var reg = ctx.registrations.Where(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id).ToList();
-
-								int viewer_count = ctx.viewers.Count(thus => thus.grade_id == v.grade_id && reg.Exists(t => t.viewer_id == thus.viewer_id));
-								//int viewer_count = ctx.registrations.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id);
-								Registration existing = ctx.registrations.SingleOrDefault(thus => thus.date == req.date && thus.block_id == req.block_id && thus.viewer_id == req.viewer_id);
-
-								if(viewer_count < 9) {
-									if(existing == null) {
-										ctx.registrations.Add(new Registration() {
-											date = req.date,
-											block_id = req.block_id,
-											presentation_id = req.presentation_id,
-											viewer_id = req.viewer_id
-										});
-									} else {
-										if(existing.presentation_id != req.presentation_id) {
-											existing.presentation_id = req.presentation_id;
-										}
-									}
-
-								} else {
-									throw new InvalidOperationException("Presentation is full!");
-								}
+								Register(ctx, req);
 
 								ctx.SaveChanges();
 								tx.Commit();
@@ -869,7 +842,7 @@ namespace StableAPIHandler {
 									StatusCode = HttpStatusCode.OK,
 									Body = JsonConvert.SerializeObject(new RegistrationResponse() {
 										status = true,
-										data = ctx.registrations.Where(thus => thus.viewer_id == req.viewer_id).ToList(),
+										data = ctx.registrations.AsNoTracking().Where(thus => thus.viewer_id == req.viewer_id).ToList(),
 										full = ctx.FullPresentations
 									})
 								};
@@ -881,7 +854,8 @@ namespace StableAPIHandler {
 										var me = e.InnerException as MySqlException;
 										return new StableAPIResponse() {
 											Body = JsonConvert.SerializeObject(new SignupErrorResponse(me.Number) {
-												data = ctx.registrations.Where(thus => thus.viewer_id == req.viewer_id).ToList(),
+												trace = me.StackTrace,
+												data = ctx.registrations.AsNoTracking().Where(thus => thus.viewer_id == req.viewer_id).ToList(),
 												full = ctx.FullPresentations
 											}),
 											StatusCode = HttpStatusCode.OK
@@ -891,7 +865,8 @@ namespace StableAPIHandler {
 								return new StableAPIResponse() {
 									Body = JsonConvert.SerializeObject(new SignupErrorResponse() {
 										Message = e.Message,
-										data = ctx.registrations.Where(thus => thus.viewer_id == req.viewer_id).ToList(),
+										trace = e.StackTrace,
+										data = ctx.registrations.AsNoTracking().Where(thus => thus.viewer_id == req.viewer_id).ToList(),
 										full = ctx.FullPresentations
 									}),
 									StatusCode = HttpStatusCode.InternalServerError
@@ -912,7 +887,7 @@ namespace StableAPIHandler {
 
 						}
 					} catch(Exception e) {
-
+						return StableAPIResponse.InternalServerError(e);
 					}
 
 					return StableAPIResponse.OK;
@@ -924,13 +899,45 @@ namespace StableAPIHandler {
 				return StableAPIResponse.BadRequest(e);
 			}
 		}
+		private void Register(StableContext ctx, RegistrationRequest req, bool ignoreFull = false) {
+			Viewer v;
+			try {
+				v = ctx.viewers.AsNoTracking().First(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key);
+			} catch (Exception e) {
+				Logger.LogLine("Bad registration auth: " + req.ToString());
+				throw e;
+			}
+			var reg = ctx.registrations.AsNoTracking().Where(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id).ToList();
+
+			int viewer_count = ctx.viewers.AsNoTracking().Count(thus => thus.grade_id == v.grade_id && reg.Exists(t => t.viewer_id == thus.viewer_id));
+			//int viewer_count = ctx.registrations.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id);
+			Registration existing = ctx.registrations.FirstOrDefault(thus => thus.date == req.date && thus.block_id == req.block_id && thus.viewer_id == req.viewer_id);
+
+			if(viewer_count < 9 || ignoreFull) {
+				if(existing == null) {
+					ctx.registrations.Add(new Registration() {
+						date = req.date,
+						block_id = req.block_id,
+						presentation_id = req.presentation_id,
+						viewer_id = req.viewer_id
+					});
+				} else {
+					if(existing.presentation_id != req.presentation_id) {
+						existing.presentation_id = req.presentation_id;
+					}
+				}
+
+			} else {
+				throw new InvalidOperationException("Presentation is full!");
+			}
+		}
 		private StableAPIResponse finishRegister(APIGatewayProxyRequest request, StableContext ctx, ILambdaContext context) {
 			try {
 				var req = JsonConvert.DeserializeObject<FinishSignupRequest>(request.Body);
 				req.status = true;
 
 				try {
-					if(ctx.viewers.Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1)
+					if(ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1)
 						return StableAPIResponse.Unauthorized;
 
 					using(var tx = ctx.Database.BeginTransaction()) {
