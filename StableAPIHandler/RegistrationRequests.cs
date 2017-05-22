@@ -34,6 +34,9 @@ namespace StableAPIHandler {
 			get;
 			set;
 		}
+		public override string ToString() {
+			return $"viewer_id: {viewer_id} viewer_key: {viewer_key} date: {date} block_id: {block_id} presentation_id: {presentation_id}";
+		}
 	}
 	public class RegistrationResponse {
 		public bool status;

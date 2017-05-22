@@ -55,6 +55,7 @@ namespace StableAPIHandler {
 			set;
 		}
 		public string Message;
+		public string trace;
 		public List<ProjectStableLibrary.Registration> data;
 		public Dictionary<uint, List<ProjectStableLibrary.Schedule>> full;
 	}
