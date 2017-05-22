@@ -856,7 +856,15 @@ namespace StableAPIHandler {
 							})
 						};
 					} catch(Exception e) {
-						return StableAPIResponse.InternalServerError(e);
+						return new StableAPIResponse() {
+							Body = JsonConvert.SerializeObject(new SignupErrorResponse() {
+								Message = e.Message,
+								trace = e.StackTrace,
+								data = ctx.registrations.AsNoTracking().Where(thus => thus.viewer_id == req.viewer_id).ToList(),
+								full = ctx.FullPresentations
+							}),
+							StatusCode = HttpStatusCode.InternalServerError
+						};
 					}
 				} catch(Exception e) {
 					return StableAPIResponse.InternalServerError(e);
