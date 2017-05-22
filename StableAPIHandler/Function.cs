@@ -49,12 +49,26 @@ namespace StableAPIHandler {
 			}
 		}
 		public APIGatewayProxyResponse TryFunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context) {
+			APIGatewayProxyResponse resp;
 			try {
-				return FunctionHandler(apigProxyEvent, context);
+				context.Logger.LogLine("Request: " + Environment.NewLine + str(apigProxyEvent));
+				resp = FunctionHandler(apigProxyEvent, context);
 			} catch(Exception e) {
 				context.Logger.LogLine(e.Message + Environment.NewLine + e.StackTrace);
-				return StableAPIResponse.InternalServerError(e);
+				resp = StableAPIResponse.InternalServerError(e);
 			}
+			context.Logger.LogLine("Response: " + Environment.NewLine + str(resp));
+
+			return resp;
+		}
+		public static string str(APIGatewayProxyRequest r) {
+			return $"Method: {r.HttpMethod}" + Environment.NewLine +
+				$"Path: {r.Path}" + Environment.NewLine +
+				$"Body: {r.Body}";
+		}
+		public static string str(APIGatewayProxyResponse r) {
+			return $"Status: {r.StatusCode}" + Environment.NewLine +
+				$"Body: {r.Body}";
 		}
 		public APIGatewayProxyResponse FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context) {
 			Logger = context.Logger;
