@@ -8,6 +8,7 @@ using Amazon.Lambda.Serialization;
 using Amazon.Lambda.APIGatewayEvents;
 using ProjectStableLibrary;
 using MySql.Data.MySqlClient;
+using MySQL.Data.EntityFrameworkCore;
 using Newtonsoft.Json;
 using System.Net;
 using Newtonsoft.Json.Linq;
@@ -33,7 +34,7 @@ namespace StableAPIHandler {
 				if(r == null)
 					throw new Exception();
 				return r;
-			} catch (Exception) {
+			} catch(Exception) {
 				switch(variable) {
 					case "enabled":
 						return "true";
@@ -372,14 +373,14 @@ namespace StableAPIHandler {
 							case "/signup/":
 								if(!enabled)
 									return noSignups;
-								response = startSignup(apigProxyEvent, ctx);
+								response = startSignup(apigProxyEvent, ctx, conStr);
 								break;
 							case "/register":
 							case "/register/":
 								if(!enabled)
 									return noSignups;
 								if(freeforall)
-									response = handleRegister(apigProxyEvent, ctx);
+									response = handleRegister(apigProxyEvent, ctx, conStr);
 								else
 									response = new StableAPIResponse() {
 										Body = "{}",
@@ -607,7 +608,7 @@ namespace StableAPIHandler {
 				return StableAPIResponse.BadRequest(e);
 			}
 		}
-		private StableAPIResponse startSignup(APIGatewayProxyRequest request, StableContext ctx) {
+		private StableAPIResponse startSignup(APIGatewayProxyRequest request, StableContext ctx, string conStr) {
 			try {
 				SignupRequest sr = JsonConvert.DeserializeObject<SignupRequest>(request.Body);
 				try {
@@ -630,16 +631,20 @@ namespace StableAPIHandler {
 							ctx.viewers.Add(v);
 							ctx.SaveChanges();
 							if(p != null) {
-								Register(ctx, new RegistrationRequest() {
-									date = p.date,
-									block_id = p.block_id,
-									presentation_id = p.presentation_id,
-									viewer_id = v.viewer_id,
-									viewer_key = v.viewer_key
-								}, true);
+								using(var dbCon = new MySqlConnection(conStr)) {
+									dbCon.Open();
+									Register(dbCon, v, new RegistrationRequest() {
+										date = p.date,
+										block_id = p.block_id,
+										presentation_id = p.presentation_id,
+										viewer_id = v.viewer_id,
+										viewer_key = v.viewer_key
+									}, true);
+								}
+								
 								ctx.SaveChanges();
 							}
-							
+
 							tx.Commit();
 
 							return new StableAPIResponse() {
@@ -807,7 +812,7 @@ namespace StableAPIHandler {
 				throw;
 			}
 		}
-		private StableAPIResponse handleRegister(APIGatewayProxyRequest request, StableContext ctx) {
+		private StableAPIResponse handleRegister(APIGatewayProxyRequest request, StableContext ctx, string conStr) {
 			try {
 				var req = JsonConvert.DeserializeObject<RegistrationRequest>(request.Body);
 				try {
@@ -830,144 +835,196 @@ namespace StableAPIHandler {
 					if(ctx.schedule.AsNoTracking().Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id) != 1)
 						return StableAPIResponse.BadRequest(new Exception("Presentation instance not found!"));
 
+					Viewer v = ctx.viewers.AsNoTracking().FirstOrDefault(thus => thus.viewer_id == req.viewer_id);
+
 					//attempt to update presentations
 					try {
-						using(var tx = ctx.Database.BeginTransaction()) {
-							try {
-								Register(ctx, req);
+						using(MySqlConnection dbCon = new MySqlConnection(conStr)) {
+							dbCon.Open();
 
-								ctx.SaveChanges();
-								tx.Commit();
-								return new StableAPIResponse() {
-									StatusCode = HttpStatusCode.OK,
-									Body = JsonConvert.SerializeObject(new RegistrationResponse() {
-										status = true,
-										data = ctx.registrations.AsNoTracking().Where(thus => thus.viewer_id == req.viewer_id).ToList(),
-										full = ctx.FullPresentations
-									})
-								};
-								//todo details & full error
-							} catch(Exception e) when (e is InvalidOperationException || e is DbUpdateException) {
-								tx.Rollback();
-								if(e.InnerException != null) {
-									if(e.InnerException.GetType() == typeof(MySqlException)) {
-										var me = e.InnerException as MySqlException;
-										return new StableAPIResponse() {
-											Body = JsonConvert.SerializeObject(new SignupErrorResponse(me.Number) {
-												trace = me.StackTrace,
-												data = ctx.registrations.AsNoTracking().Where(thus => thus.viewer_id == req.viewer_id).ToList(),
-												full = ctx.FullPresentations
-											}),
-											StatusCode = HttpStatusCode.OK
-										};
-									}
-								}
-								return new StableAPIResponse() {
-									Body = JsonConvert.SerializeObject(new SignupErrorResponse() {
-										Message = e.Message,
-										trace = e.StackTrace,
-										data = ctx.registrations.AsNoTracking().Where(thus => thus.viewer_id == req.viewer_id).ToList(),
-										full = ctx.FullPresentations
-									}),
-									StatusCode = HttpStatusCode.InternalServerError
-								};
-							} catch(Exception e) {
-								tx.Rollback();
-								var expt = e;
-								while(expt != null) {
-									Logger.LogLine(expt.Message);
-									expt = expt.InnerException;
-								}
-								return new StableAPIResponse() {
-									Body = JsonConvert.SerializeObject(new Result(e)),
-									StatusCode = HttpStatusCode.InternalServerError
-								};
-
-							}
-
+							Register(dbCon, v, req);
 						}
+						return new StableAPIResponse() {
+							StatusCode = HttpStatusCode.OK,
+							Body = JsonConvert.SerializeObject(new RegistrationResponse() {
+								status = true,
+								data = ctx.registrations.AsNoTracking().Where(thus => thus.viewer_id == req.viewer_id).ToList(),
+								full = ctx.FullPresentations
+							})
+						};
 					} catch(Exception e) {
 						return StableAPIResponse.InternalServerError(e);
 					}
-
-					return StableAPIResponse.OK;
 				} catch(Exception e) {
 					return StableAPIResponse.InternalServerError(e);
 				}
-			} catch (Exception e) {
+			} catch(Exception e) {
 				Logger.LogLine(e.Message.ToString());
 				return StableAPIResponse.BadRequest(e);
 			}
 		}
-		private void Register(StableContext ctx, RegistrationRequest req, bool ignoreFull = false) {
-			Viewer v;
-			try {
-				v = ctx.viewers.AsNoTracking().First(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key);
-			} catch (Exception e) {
-				Logger.LogLine("Bad registration auth: " + req.ToString());
-				throw e;
+		private void Register(MySqlConnection dbCon, Viewer v, RegistrationRequest req, bool ignoreFull = false) {
+			List<RegistrationRequest> reqs = new List<RegistrationRequest>();
+			reqs.Add(req);
+
+			string q;
+
+			//Find a coreq group
+			uint? g_id = null;
+
+			q = "SELECT `group_id` FROM `corequisite_members` WHERE `p_id` = @p_id LIMIT 1;";
+
+			using(var cmd = new MySqlCommand(q, dbCon)) {
+				cmd.Prepare();
+				cmd.Parameters.AddWithValue("@p_id", req.presentation_id);
+				g_id = (uint?)cmd.ExecuteScalar();
 			}
 
-			var cm = ctx.CoRequisiteMembers.AsNoTracking().FirstOrDefault(thus => thus.p_id == req.presentation_id);
-			if(cm != null) {
-				var coreqs = ctx.CoRequisiteMembers.AsNoTracking().Where(thus => thus.group_id == cm.group_id).ToList();
-				foreach(var c in coreqs) {
-					RegisterInternal(ctx, v, RegistrationRequest.FromPresentation(ctx, c.p_id, req.viewer_id, req.viewer_key), ignoreFull);
-					ctx.SaveChanges();
+
+			if(g_id.HasValue) {
+				//get list of coreqs to add
+				q = "SELECT `p_id` FROM `corequisite_members` WHERE `group_id` = @g_id AND `p_id` != @p_id;";
+				List<uint> ids = new List<uint>();
+				using(var cmd = new MySqlCommand(q, dbCon)) {
+					cmd.Prepare();
+					cmd.Parameters.AddWithValue("@g_id", g_id.Value);
+					cmd.Parameters.AddWithValue("@p_id", req.presentation_id);
+					using(var r = cmd.ExecuteReader()) {
+						while(r.Read()) {
+							ids.Add(r.GetUInt32("p_id"));
+						}
+						r.Close();
+					}
 				}
-			} else {
-				RegisterInternal(ctx, v, req, ignoreFull);
+
+				Logger.LogLine($"PSSOSOS: {string.Join(", ", ids)}");
+
+				//get presentation info for each id to add, including coreqs
+				q = "SELECT `presentation_id`, `date`, `block_id` FROM `presentations` WHERE `presentation_id` IN (" + string.Join(",", ids) + ");";
+
+				using(var cmd = new MySqlCommand(q, dbCon)) {
+
+					using(var r = cmd.ExecuteReader()) {
+						while(r.Read()) {
+							reqs.Add(new RegistrationRequest() {
+								date = r.GetUInt32("date"),
+								block_id = r.GetUInt32("block_id"),
+								presentation_id = r.GetUInt32("presentation_id"),
+								viewer_id = req.viewer_id,
+								viewer_key = req.viewer_key
+							});
+						}
+					}
+				}
 			}
 
+			Logger.LogLine($"PSSOSOS: {string.Join(", ", reqs)}");
+			//register all ids
+			using(var tx = dbCon.BeginTransaction()) {
+				try {
+					foreach(var r in reqs) {
+						RegisterInternal(dbCon, tx, v, r, ignoreFull);
+					}
+					tx.Commit();
+				} catch {
+					tx.Rollback();
+					throw;
+				}
 
-			
+			}
+
 		}
-		private void RegisterInternal(StableContext ctx, Viewer v, RegistrationRequest req, bool ignoreFull) {
-			var reg = ctx.registrations.AsNoTracking().Where(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id).ToList();
+		private void RegisterInternal(MySqlConnection dbCon, MySqlTransaction tx, Viewer v, RegistrationRequest req, bool ignoreFull) {
+			string q;
+			//check the count if not ignoring
+			long count = 0;
+			if(!ignoreFull) {
+				q = "SELECT COUNT(*) FROM `registrations` WHERE `date`=@date AND `block_id`=@block_id AND `presentation_id`=@presentation_id;";
+				using(var cmd = new MySqlCommand(q, dbCon, tx)) {
+					cmd.Prepare();
+					cmd.Parameters.AddWithValue("@date", req.date);
+					cmd.Parameters.AddWithValue("@block_id", req.block_id);
+					cmd.Parameters.AddWithValue("@presentation_id", req.presentation_id);
+					count = (long)cmd.ExecuteScalar();
+				}
+				if(count >= 9) {
+					throw new InvalidOperationException("Presentation is full!");
+				}
+			}
 
-			int viewer_count = ctx.viewers.AsNoTracking().Count(thus => thus.grade_id == v.grade_id && reg.Exists(t => t.viewer_id == thus.viewer_id));
-			//int viewer_count = ctx.registrations.Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id);
+			Logger.LogLine($"Req: {req.ToString()}");
 
-			var existing = ctx.registrations.FirstOrDefault(thus => thus.date == req.date && thus.block_id == req.block_id && thus.viewer_id == req.viewer_id);
-			if(existing != null) {
-				var cm = ctx.CoRequisiteMembers.AsNoTracking().FirstOrDefault(thus => thus.p_id == existing.presentation_id); //registrations to remove
-				if(cm != null) {
-					var registrationsToRemove = ctx.CoRequisiteMembers.AsNoTracking().Where(thus => thus.group_id == cm.group_id && thus.p_id != existing.presentation_id).ToList();
-					Logger.LogLine($"Found regis {string.Join(", ", registrationsToRemove.Select(thus => thus.p_id))}");
+			//Remove any existing regs in that slot, and if it has coreqs, them too
+			RemoveExisting(dbCon, tx, req);
 
-					if(registrationsToRemove.Count > 0) {
-						//ughly hack
-						ctx.Database.ExecuteSqlCommand($"DELETE FROM `registrations` WHERE `viewer_id` = @viewer_id AND `presentation_id` IN ({string.Join(",", registrationsToRemove.Select(thus => thus.p_id))});",
-							new[] { new MySqlParameter("@viewer_id", v.viewer_id) });
+			//Add new reg
+			q = "INSERT INTO `projectstable`.`registrations` (`date`, `block_id`, `viewer_id`, `presentation_id`) VALUES (@date, @block_id, @viewer_id, @p_id); ";
+			using(var cmd = new MySqlCommand(q, dbCon, tx)) {
+				cmd.Prepare();
+				cmd.Parameters.AddWithValue("@date", req.date);
+				cmd.Parameters.AddWithValue("@block_id", req.block_id);
+				cmd.Parameters.AddWithValue("@viewer_id", req.viewer_id);
+				cmd.Parameters.AddWithValue("@p_id", req.presentation_id);
+				if(cmd.ExecuteNonQuery() != 1)
+					throw new Exception();
+			}
+		}
+		private void RemoveExisting(MySqlConnection dbCon, MySqlTransaction tx, RegistrationRequest req) {
+			List<uint> toRemove = new List<uint>();
+			string q;
 
-						ctx.SaveChanges();
+			uint? existingPresentation = null;
+
+			//get existing p_id in the registration slot
+			q = "SELECT `presentation_id` FROM `registrations` WHERE `date`=@date AND `block_id`=@block_id AND `viewer_id`=@viewer_id;";
+			using(var cmd = new MySqlCommand(q, dbCon, tx)) {
+				cmd.Prepare();
+				cmd.Parameters.AddWithValue("@date", req.date);
+				cmd.Parameters.AddWithValue("@block_id", req.block_id);
+				cmd.Parameters.AddWithValue("@viewer_id", req.viewer_id);
+				existingPresentation = (uint?)cmd.ExecuteScalar();
+			}
+
+			if(!existingPresentation.HasValue) {
+				Logger.LogLine("Exists: false");
+				return;
+			}
+			Logger.LogLine("Exists: true");
+
+			toRemove.Add(existingPresentation.Value);
+
+			//Check if it has coreqs
+			uint? g_id = null;
+
+			q = "SELECT `group_id` FROM `corequisite_members` WHERE `p_id`=@p_id LIMIT 1;";
+			using(var cmd = new MySqlCommand(q, dbCon, tx)) {
+				cmd.Prepare();
+				cmd.Parameters.AddWithValue("@p_id", existingPresentation.Value);
+				g_id = (uint?)cmd.ExecuteScalar();
+			}
+
+			if(g_id.HasValue) {
+				//it does, so add them to the remove list
+				q = "SELECT `p_id` FROM `corequisite_members` WHERE `group_id`=@g_id;";
+				using(var cmd = new MySqlCommand(q, dbCon, tx)) {
+					cmd.Prepare();
+					cmd.Parameters.AddWithValue("@g_id", g_id.Value);
+					using(var r = cmd.ExecuteReader()) {
+						while(r.Read()) {
+							toRemove.Add(r.GetUInt32("p_id"));
+						}
 					}
 				}
 			}
-			
 
-			//var existing = ctx.registrations.FirstOrDefault(thus => thus.date == req.date && thus.block_id == req.block_id && thus.viewer_id == req.viewer_id);
-			Logger.LogLine($"Exists: {existing != null}");
+			//remove all
+			toRemove = toRemove.Distinct().ToList();
 
-			if(viewer_count < 9 || ignoreFull) {
-				if(existing == null) {
-					ctx.registrations.Add(new Registration() {
-						date = req.date,
-						block_id = req.block_id,
-						presentation_id = req.presentation_id,
-						viewer_id = req.viewer_id
-					});
-				} else {
-					if(existing.presentation_id != req.presentation_id) {
-						//check if this was a coreq, if so, unregister from the other coreqs
-						
-
-						existing.presentation_id = req.presentation_id;
-					}
-				}
-
-			} else {
-				throw new InvalidOperationException("Presentation is full!");
+			q = "DELETE FROM `registrations` WHERE `viewer_id`=@v_id AND `presentation_id` IN (" + string.Join(",", toRemove) + ");";
+			using(var cmd = new MySqlCommand(q, dbCon, tx)) {
+				cmd.Prepare();
+				cmd.Parameters.AddWithValue("@v_id", req.viewer_id);
+				cmd.ExecuteNonQuery();
 			}
 		}
 		private StableAPIResponse finishRegister(APIGatewayProxyRequest request, StableContext ctx, ILambdaContext context) {
@@ -999,7 +1056,7 @@ namespace StableAPIHandler {
 							};
 						}
 					}
-					
+
 
 				} catch(Exception e) {
 					return new StableAPIResponse() {
