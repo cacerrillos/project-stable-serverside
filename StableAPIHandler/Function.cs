@@ -615,8 +615,8 @@ namespace StableAPIHandler {
 					// Create viewer entry first, so if they don't submit properly
 					// we'll have their info and can randomly place them.
 					Viewer v = new Viewer() {
-						first_name = sr.first_name,
-						last_name = sr.last_name,
+						first_name = sr.first_name.Trim(),
+						last_name = sr.last_name.Trim(),
 						grade_id = sr.grade,
 						house_id = sr.house,
 						viewer_key = Guid.NewGuid().ToString().Substring(0, 16)
