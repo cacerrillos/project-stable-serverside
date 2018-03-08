@@ -8,7 +8,6 @@ using Amazon.Lambda.Serialization;
 using Amazon.Lambda.APIGatewayEvents;
 using ProjectStableLibrary;
 using MySql.Data.MySqlClient;
-using MySQL.Data.EntityFrameworkCore;
 using Newtonsoft.Json;
 using System.Net;
 using Newtonsoft.Json.Linq;
@@ -622,22 +621,29 @@ namespace StableAPIHandler {
 						viewer_key = Guid.NewGuid().ToString().Substring(0, 16)
 					};
 					Presentation p = null;
-					if(sr.reserved != -1 && sr.grade == 4)
+					Schedule p_s = null;
+					if(sr.reserved != -1 && sr.grade == 4) {
 						p = ctx.presentations.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == sr.reserved);
+						uint block_id = uint.MaxValue;
+						p_s = ctx.schedule.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == sr.reserved);
+					}
+					
 
-
+					
 					using(var tx = ctx.Database.BeginTransaction()) {
 						try {
 							ctx.viewers.Add(v);
 							ctx.SaveChanges();
 							tx.Commit();
 							if(p != null) {
+								if(p_s == null)
+									throw new Exception($"Schedule not found for presentation! [{p.presentation_id}]");
 								try {
 									using(var dbCon = new MySqlConnection(conStr)) {
 										dbCon.Open();
 										Register(dbCon, v, new RegistrationRequest() {
-											date = p.date,
-											block_id = p.block_id,
+											date = p_s.date,
+											block_id = p_s.block_id,
 											presentation_id = p.presentation_id,
 											viewer_id = v.viewer_id,
 											viewer_key = v.viewer_key

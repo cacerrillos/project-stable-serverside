@@ -2,6 +2,7 @@
 using System.Linq;
 using ProjectStableLibrary;
 using Microsoft.EntityFrameworkCore;
+using System;
 
 namespace StableAPIHandler {
 	public struct PresentationStats {
@@ -40,10 +41,11 @@ namespace StableAPIHandler {
 		}
 		public static RegistrationRequest FromPresentation(StableContext ctx,  uint p_id, uint v_id, string v_key) {
 			var p = ctx.presentations.AsNoTracking().First(thus => thus.presentation_id == p_id);
+			var p_s = ctx.schedule.AsNoTracking().First(thus => thus.presentation_id == p.presentation_id);
 			
 			return new RegistrationRequest() {
-				date = p.date,
-				block_id = p.block_id,
+				date = p_s.date,
+				block_id = p_s.block_id,
 				presentation_id = p_id,
 				viewer_id = v_id,
 				viewer_key = v_key

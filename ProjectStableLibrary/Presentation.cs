@@ -27,14 +27,6 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
-		public uint date {
-			get;
-			set;
-		}
-		public uint block_id {
-			get;
-			set;
-		}
 		public uint location_id {
 			get;
 			set;
