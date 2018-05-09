@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ConsoleTools {
 	public class CareerDay {
+		public const int date = 20180316;
+		private static bool prioritizeByGrade = true;
 		public static void run() {
 			bool careerDay = false;
 			string s;
@@ -67,8 +69,28 @@ namespace ConsoleTools {
 				const int retry_count = 5;
 
 				var toAddToDB = new List<Registration>();
+				{
+					string s;
+					char c;
+					do {
+						Console.Write("Prioritize by grade? (y/n): ");
+						s = Console.ReadLine().ToUpper();
+						if(s.Length > 0) {
+							c = s[0];
+							if(c == 'Y' || c == 'N') {
+								prioritizeByGrade = c == 'Y';
+								break;
+							}
+						} else {
+							c = ' ';
+						}
+					} while(true);
+				}
 
-				uint[] grade_pri = new uint[] {3, 2, 4, 1};
+				uint[] grade_pri = new uint[] { 0 };
+				if(prioritizeByGrade) {
+					grade_pri = new uint[] { 3, 2, 4, 1 };
+				}
 				
 				uint max_viewers = 27;
 
@@ -85,14 +107,19 @@ namespace ConsoleTools {
 						Console.WriteLine("Invalid input!");
 					}
 				} while(true);
+
 				
+
 				DateTime start = DateTime.Now;
 				foreach(uint g in grade_pri) {
 					// if(g != 3)
 					// 	continue;
 					var viewers_to_proc = new List<uint>();
 
-					viewers_to_proc.AddRange(from thus in viewers where thus.Value.grade_id == g select thus.Value.viewer_id);
+					if(prioritizeByGrade)
+						viewers_to_proc.AddRange(from thus in viewers where thus.Value.grade_id == g select thus.Value.viewer_id);
+					else
+						viewers_to_proc.AddRange(from thus in viewers select thus.Value.viewer_id);
 
 					viewers_to_proc.Randomize();
 
@@ -104,7 +131,7 @@ namespace ConsoleTools {
 						bool randomize = v_pref.Count < presentations.Count;
 						
 						
-						var temp_s = new Schedule(){ date = 20170324 };
+						var temp_s = new Schedule(){ date = date };
 						var blocks_r = blocks.Values.ToList();
 
 						int error_count = 0;
