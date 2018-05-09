@@ -4,7 +4,6 @@ using Amazon.Lambda.Core;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
-using MySQL.Data.EntityFrameworkCore.Extensions;
 using MySql.Data.MySqlClient;
 using Newtonsoft.Json;
 using System.Linq;
