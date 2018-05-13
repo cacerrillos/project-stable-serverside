@@ -36,8 +36,12 @@ namespace StableAPIHandler {
 			get;
 			set;
 		}
+		public uint location_id {
+			get;
+			set;
+		}
 		public override string ToString() {
-			return $"viewer_id: {viewer_id} viewer_key: {viewer_key} date: {date} block_id: {block_id} presentation_id: {presentation_id}";
+			return $"viewer_id: {viewer_id} viewer_key: {viewer_key} date: {date} block_id: {block_id} presentation_id: {presentation_id} location_id: {location_id}";
 		}
 		public static RegistrationRequest FromPresentation(StableContext ctx,  uint p_id, uint v_id, string v_key) {
 			var p = ctx.presentations.AsNoTracking().First(thus => thus.presentation_id == p_id);
@@ -48,7 +52,8 @@ namespace StableAPIHandler {
 				block_id = p_s.block_id,
 				presentation_id = p_id,
 				viewer_id = v_id,
-				viewer_key = v_key
+				viewer_key = v_key,
+				location_id = p.location_id
 			};
 		}
 	}

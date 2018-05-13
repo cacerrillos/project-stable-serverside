@@ -201,7 +201,10 @@ namespace ProjectStableLibrary {
 					foreach(var s in sche) {
 						int c = reg.Count(thus => thus.Schedule().Equals(s) && viewerSubset.Any(t => t.Value.viewer_id == thus.viewer_id));
 						if(c > 8) {
-							full[g.grade_id].Add(s);
+							var presentation = presentations.AsNoTracking().First(thus => thus.presentation_id == s.presentation_id);
+							
+							if(presentation.location_id != 20)
+								full[g.grade_id].Add(s);
 						}
 					}
 				}

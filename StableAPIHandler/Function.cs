@@ -646,11 +646,16 @@ namespace StableAPIHandler {
 											block_id = p_s.block_id,
 											presentation_id = p.presentation_id,
 											viewer_id = v.viewer_id,
-											viewer_key = v.viewer_key
+											viewer_key = v.viewer_key,
+											location_id = p.location_id
 										}, true);
 									}
 								} catch(Exception e) {
 									Logger.LogLine(str(StableAPIResponse.InternalServerError(e)));
+									return new StableAPIResponse() {
+										Body = JsonConvert.SerializeObject(new Result(e)),
+										StatusCode = HttpStatusCode.InternalServerError
+									};
 								}
 							}
 
@@ -841,8 +846,12 @@ namespace StableAPIHandler {
 						};
 					}
 
-					if(ctx.schedule.AsNoTracking().Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id) != 1)
+
+					if (ctx.schedule.AsNoTracking().Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id) != 1)
 						return StableAPIResponse.BadRequest(new Exception("Presentation instance not found!"));
+
+					var presentation = ctx.presentations.AsNoTracking().First(thus => thus.presentation_id == req.presentation_id);
+					req.location_id = presentation.location_id;
 
 					Viewer v = ctx.viewers.AsNoTracking().FirstOrDefault(thus => thus.viewer_id == req.viewer_id);
 
@@ -917,7 +926,7 @@ namespace StableAPIHandler {
 				Logger.LogLine($"PSSOSOS: {string.Join(", ", ids)}");
 
 				//get presentation info for each id to add, including coreqs
-				q = "SELECT `presentation_id`, `date`, `block_id` FROM `presentations` WHERE `presentation_id` IN (" + string.Join(",", ids) + ");";
+				q = "SELECT `presentation_id`, `date`, `block_id`, `location_id` FROM `presentations` WHERE `presentation_id` IN (" + string.Join(",", ids) + ");";
 
 				using(var cmd = new MySqlCommand(q, dbCon)) {
 
@@ -928,7 +937,8 @@ namespace StableAPIHandler {
 								block_id = r.GetUInt32("block_id"),
 								presentation_id = r.GetUInt32("presentation_id"),
 								viewer_id = req.viewer_id,
-								viewer_key = req.viewer_key
+								viewer_key = req.viewer_key,
+								location_id = r.GetUInt32("location_id")
 							});
 						}
 					}
@@ -967,7 +977,7 @@ namespace StableAPIHandler {
 					count = (long)cmd.ExecuteScalar();
 				}
 				Logger.LogLine("Count by g: " + count);
-				if(count >= 9) {
+				if(count > 8 && req.location_id != 20) {
 					throw new InvalidOperationException("Presentation is full!");
 				}
 			}
@@ -978,7 +988,7 @@ namespace StableAPIHandler {
 			RemoveExisting(dbCon, tx, req);
 
 			//Add new reg
-			q = "INSERT INTO `projectstable`.`registrations` (`date`, `block_id`, `viewer_id`, `presentation_id`) VALUES (@date, @block_id, @viewer_id, @p_id); ";
+			q = "INSERT INTO `registrations` (`date`, `block_id`, `viewer_id`, `presentation_id`) VALUES (@date, @block_id, @viewer_id, @p_id); ";
 			using(var cmd = new MySqlCommand(q, dbCon, tx)) {
 				cmd.Prepare();
 				cmd.Parameters.AddWithValue("@date", req.date);
