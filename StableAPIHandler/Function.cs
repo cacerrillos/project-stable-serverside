@@ -622,10 +622,24 @@ namespace StableAPIHandler {
 					};
 					Presentation p = null;
 					Schedule p_s = null;
+
+					Presentation pre_presentation = null;
+					Schedule pre_schedule = null;
+
 					if(sr.reserved != -1 && sr.grade == 4) {
 						p = ctx.presentations.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == sr.reserved);
 						uint block_id = uint.MaxValue;
 						p_s = ctx.schedule.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == sr.reserved);
+
+						if(p_s.block_id != 1 && p_s.block_id != 7) { // Find previous presentation at the same location
+							var possiblePres = ctx.schedule.AsNoTracking().Where(thus => thus.date == p_s.date && thus.block_id == (p_s.block_id - 1)).Select(thus => thus.presentation_id);
+							var found = ctx.presentations.AsNoTracking().Where(thus => thus.location_id == p.location_id && possiblePres.Contains(thus.presentation_id));
+
+							if(found.Count() == 1) {
+								pre_presentation = found.First();
+								pre_schedule = ctx.schedule.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == pre_presentation.presentation_id);
+							}
+						}
 					}
 					
 
@@ -649,6 +663,17 @@ namespace StableAPIHandler {
 											viewer_key = v.viewer_key,
 											location_id = p.location_id
 										}, true);
+
+										if(pre_presentation != null && pre_schedule != null) {
+											Register(dbCon, v, new RegistrationRequest() {
+												date = pre_schedule.date,
+												block_id = pre_schedule.block_id,
+												presentation_id = pre_presentation.presentation_id,
+												viewer_id = v.viewer_id,
+												viewer_key = v.viewer_key,
+												location_id = pre_presentation.location_id
+											}, true);
+										}
 									}
 								} catch(Exception e) {
 									Logger.LogLine(str(StableAPIResponse.InternalServerError(e)));
