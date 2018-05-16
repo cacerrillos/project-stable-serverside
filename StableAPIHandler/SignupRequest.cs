@@ -32,6 +32,7 @@ namespace StableAPIHandler {
 			last_name = v.last_name;
 			house_id = v.house_id;
 			grade_id = v.grade_id;
+			reserved = v.reserved;
 		}
 		public bool status {
 			get;

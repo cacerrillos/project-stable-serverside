@@ -618,7 +618,8 @@ namespace StableAPIHandler {
 						last_name = sr.last_name.Trim(),
 						grade_id = sr.grade,
 						house_id = sr.house,
-						viewer_key = Guid.NewGuid().ToString().Substring(0, 16)
+						viewer_key = Guid.NewGuid().ToString().Substring(0, 16),
+						reserved = sr.reserved
 					};
 					Presentation p = null;
 					Schedule p_s = null;
@@ -626,10 +627,25 @@ namespace StableAPIHandler {
 					Presentation pre_presentation = null;
 					Schedule pre_schedule = null;
 
+					Dictionary<Presentation, Schedule> others = new Dictionary<Presentation, Schedule>();
+
+
 					if(sr.reserved != -1 && sr.grade == 4) {
 						p = ctx.presentations.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == sr.reserved);
 						uint block_id = uint.MaxValue;
 						p_s = ctx.schedule.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == sr.reserved);
+
+						var main_co = ctx.CoRequisiteMembers.AsNoTracking().FirstOrDefault(thus => thus.p_id == p.presentation_id);
+						if(main_co != null) {
+							var group_id = main_co.group_id;
+							var otherP = ctx.CoRequisiteMembers.FirstOrDefault(thus => thus.group_id == group_id && thus.p_id != p.presentation_id);
+
+							var otherS = ctx.schedule.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == otherP.p_id);
+
+							others.Add(ctx.presentations.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == otherP.p_id), otherS);
+						}
+
+
 
 						if(p_s.block_id != 1 && p_s.block_id != 7) { // Find previous presentation at the same location
 							var possiblePres = ctx.schedule.AsNoTracking().Where(thus => thus.date == p_s.date && thus.block_id == (p_s.block_id - 1)).Select(thus => thus.presentation_id);
@@ -638,6 +654,18 @@ namespace StableAPIHandler {
 							if(found.Count() == 1) {
 								pre_presentation = found.First();
 								pre_schedule = ctx.schedule.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == pre_presentation.presentation_id);
+
+								
+								var main_co_2 = ctx.CoRequisiteMembers.AsNoTracking().FirstOrDefault(thus => thus.p_id == pre_presentation.presentation_id);
+								if(main_co_2 != null) {
+									var group_id = main_co_2.group_id;
+									var otherP = ctx.CoRequisiteMembers.FirstOrDefault(thus => thus.group_id == group_id && thus.p_id != pre_presentation.presentation_id);
+
+									var otherS = ctx.schedule.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == otherP.p_id);
+
+									others.Add(ctx.presentations.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == otherP.p_id), otherS);
+								}
+
 							}
 						}
 					}
@@ -672,6 +700,25 @@ namespace StableAPIHandler {
 												viewer_id = v.viewer_id,
 												viewer_key = v.viewer_key,
 												location_id = pre_presentation.location_id
+											}, true);
+
+										}
+
+										foreach(var o in others) {
+											if(o.Key.presentation_id == p.presentation_id)
+												continue;
+
+											if(pre_presentation != null)
+												if(pre_presentation.presentation_id == o.Key.presentation_id)
+													continue;
+
+											Register(dbCon, v, new RegistrationRequest() {
+												date = o.Value.date,
+												block_id = o.Value.block_id,
+												presentation_id = o.Key.presentation_id,
+												viewer_id = v.viewer_id,
+												viewer_key = v.viewer_key,
+												location_id = o.Key.location_id
 											}, true);
 										}
 									}
@@ -885,6 +932,8 @@ namespace StableAPIHandler {
 						using(MySqlConnection dbCon = new MySqlConnection(conStr)) {
 							dbCon.Open();
 
+							if(req.presentation_id >= 142)
+								throw new Exception("Locked Presentation!");
 							Register(dbCon, v, req);
 						}
 						return new StableAPIResponse() {
@@ -950,17 +999,41 @@ namespace StableAPIHandler {
 
 				Logger.LogLine($"PSSOSOS: {string.Join(", ", ids)}");
 
-				//get presentation info for each id to add, including coreqs
-				q = "SELECT `presentation_id`, `date`, `block_id`, `location_id` FROM `presentations` WHERE `presentation_id` IN (" + string.Join(",", ids) + ");";
+				q = "SELECT `date`, `block_id`, `presentation_id` FROM `schedule` WHERE `presentation_id` IN (" + string.Join(",", ids) + ");";
+
+				List<Schedule> schedules = new List<Schedule>();
+
+				using(var cmd = new MySqlCommand(q, dbCon)) {
+					using(var r = cmd.ExecuteReader()) {
+						while(r.Read()) {
+							schedules.Add(new Schedule() {
+								date = r.GetUInt32("date"),
+								block_id = r.GetUInt32("block_id"),
+								presentation_id = r.GetUInt32("presentation_id")
+							});
+						}
+					}
+				}
+
+					//get presentation info for each id to add, including coreqs
+					q = "SELECT `presentation_id`, `location_id` FROM `presentations` WHERE `presentation_id` IN (" + string.Join(",", ids) + ");";
+
+				
 
 				using(var cmd = new MySqlCommand(q, dbCon)) {
 
 					using(var r = cmd.ExecuteReader()) {
 						while(r.Read()) {
+							var p_id = r.GetUInt32("presentation_id");
+
+							var sch = schedules.First(thus => thus.presentation_id == p_id);
+							if(sch == null)
+								throw new Exception();
+
 							reqs.Add(new RegistrationRequest() {
-								date = r.GetUInt32("date"),
-								block_id = r.GetUInt32("block_id"),
-								presentation_id = r.GetUInt32("presentation_id"),
+								date = sch.date,
+								block_id = sch.block_id,
+								presentation_id = p_id,
 								viewer_id = req.viewer_id,
 								viewer_key = req.viewer_key,
 								location_id = r.GetUInt32("location_id")
@@ -1047,6 +1120,9 @@ namespace StableAPIHandler {
 			Logger.LogLine("Exists: true");
 
 			toRemove.Add(existingPresentation.Value);
+
+			if(existingPresentation.Value >= 142)
+				throw new Exception("PREP Required!");
 
 			//Check if it has coreqs
 			uint? g_id = null;

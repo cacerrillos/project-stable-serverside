@@ -43,6 +43,10 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
+		public int reserved {
+			get;
+			set;
+		}
 		// public virtual Grade Grade {
 		// 	get;
 		// 	set;
