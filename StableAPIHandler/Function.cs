@@ -611,16 +611,108 @@ namespace StableAPIHandler {
 			try {
 				SignupRequest sr = JsonConvert.DeserializeObject<SignupRequest>(request.Body);
 				try {
+					sr.TrimAll();
+
+					if(sr.version != "1.0" || !sr.resume.HasValue) {
+						//Send error with HTTP 200 for backwards compatability until next year
+
+						return new StableAPIResponse() {
+							Body = JsonConvert.SerializeObject(new Result() {
+								status = false,
+								details = "Outdated Version! Hard reload or try a different browser!"
+							}),
+
+							StatusCode = HttpStatusCode.OK
+						};
+					}
+
+					if(sr.resume.Value) {
+						//fetch user by email and password, send signup response
+						try {
+							var viewers = ctx.viewers.AsNoTracking().Where(thus => thus.email == sr.email);
+
+							if(viewers.Count() != 1) {
+								return new StableAPIResponse() {
+									Body = JsonConvert.SerializeObject(new Result() {
+										status = false,
+										details = "Email not found!"
+									}),
+
+									StatusCode = HttpStatusCode.OK
+								};
+							} else {
+								//check password
+								Viewer viewer = viewers.First();
+
+								if(!SecurePasswordHasher.Verify(sr.password, viewer.password)) {
+									return new StableAPIResponse() {
+										Body = JsonConvert.SerializeObject(new Result() {
+											status = false,
+											details = "Incorrect Password!"
+										}),
+
+										StatusCode = HttpStatusCode.OK
+									};
+								}
+
+								return new StableAPIResponse() {
+									Body = JsonConvert.SerializeObject(new SignupResponse(viewer) {
+										status = true
+									}),
+									StatusCode = HttpStatusCode.OK
+								};
+							}
+
+							
+						} catch {
+							return new StableAPIResponse() {
+								Body = JsonConvert.SerializeObject(new Result() {
+									status = false,
+									details = "Login Error!"
+								}),
+
+								StatusCode = HttpStatusCode.OK
+							};
+						}
+						throw new Exception("LoginError");
+					}
+
 					// Create viewer entry first, so if they don't submit properly
 					// we'll have their info and can randomly place them.
+
+					if(ctx.viewers.AsNoTracking().Any(thus => thus.email == sr.email)) {
+						return new StableAPIResponse() {
+							Body = JsonConvert.SerializeObject(new Result() {
+								status = false,
+								details = "Email already used!"
+							}),
+
+							StatusCode = HttpStatusCode.OK
+						};
+					}
+
 					Viewer v = new Viewer() {
 						first_name = sr.first_name.Trim(),
 						last_name = sr.last_name.Trim(),
 						grade_id = sr.grade,
 						house_id = sr.house,
 						viewer_key = Guid.NewGuid().ToString().Substring(0, 16),
-						reserved = sr.reserved
+						reserved = sr.reserved,
+						email = sr.email,
+						password = SecurePasswordHasher.Hash(sr.password)
 					};
+
+					if (v.first_name.Length == 0 || v.last_name.Length == 0) {
+						return new StableAPIResponse() {
+							Body = JsonConvert.SerializeObject(new Result() {
+								status = false,
+								details = "Name cannot be empty!"
+							}),
+							
+							StatusCode = HttpStatusCode.OK
+						};
+					}
+
 					Presentation p = null;
 					Schedule p_s = null;
 
@@ -905,7 +997,8 @@ namespace StableAPIHandler {
 					if(ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1) {
 						return StableAPIResponse.Unauthorized;
 					}
-					if(ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.Saved()) == 1) {
+					//disable for login
+					if(false && ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.Saved()) == 1) {
 						return new StableAPIResponse() {
 							StatusCode = HttpStatusCode.OK,
 							Body = JsonConvert.SerializeObject(new RegistrationResponse() {

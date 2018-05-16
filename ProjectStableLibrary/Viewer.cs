@@ -51,6 +51,18 @@ namespace ProjectStableLibrary {
 		// 	get;
 		// 	set;
 		// }
+
+		[MaxLength(255)]
+		public string email {
+			get;
+			set;
+		}
+
+		[MaxLength(255)]
+		public string password {
+			get;
+			set;
+		}
 		public SanitizedViewer Sanitize() {
 			return new SanitizedViewer(this);
 		}

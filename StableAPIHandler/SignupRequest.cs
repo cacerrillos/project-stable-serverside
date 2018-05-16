@@ -23,6 +23,29 @@ namespace StableAPIHandler {
 			get;
 			set;
 		}
+
+		public string version {
+			get;
+			set;
+		}
+
+		public string email {
+			get;
+			set;
+		}
+		public string password {
+			get;
+			set;
+		}
+		public bool? resume {
+			get;
+			set;
+		}
+		public void TrimAll() {
+			email = email.Trim();
+			first_name = first_name.Trim();
+			last_name = last_name.Trim();
+		}
 	}
 	public class SignupResponse : ProjectStableLibrary.Viewer {
 		public SignupResponse(ProjectStableLibrary.Viewer v) {
