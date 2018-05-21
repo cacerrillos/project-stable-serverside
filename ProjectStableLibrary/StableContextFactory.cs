@@ -200,12 +200,21 @@ namespace ProjectStableLibrary {
 					var viewerSubset = viewers.Where(thus => thus.Value.grade_id == g.grade_id);
 					foreach(var s in sche) {
 						int c = reg.Count(thus => thus.Schedule().Equals(s) && viewerSubset.Any(t => t.Value.viewer_id == thus.viewer_id));
-						if(c > 8) {
-							var presentation = presentations.AsNoTracking().First(thus => thus.presentation_id == s.presentation_id);
-							
-							if(presentation.location_id != 20)
+						var presentation = presentations.AsNoTracking().First(thus => thus.presentation_id == s.presentation_id);
+
+						int gradeMax = (s.block_id == 7 || s.block_id == 8) ? 12 : 9;
+						int allMax = (s.block_id == 7 || s.block_id == 8) ? 60 : 50;
+
+						if(presentation.location_id == 20) {
+							if(reg.Count(thus => thus.Schedule().Equals(s)) >= allMax) {
 								full[g.grade_id].Add(s);
+							}
+						} else {
+							if(c >= gradeMax) {
+								full[g.grade_id].Add(s);
+							}
 						}
+						
 					}
 				}
 

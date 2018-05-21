@@ -62,6 +62,22 @@ namespace StableAPIHandler {
 			return resp;
 		}
 		public static string str(APIGatewayProxyRequest r) {
+			if(r.Path.Contains("signup") && !r.Path.Contains("signup/finish")) {
+				if(r.Body.Contains("password")) {
+					try {
+						SignupRequest sr = JsonConvert.DeserializeObject<SignupRequest>(r.Body);
+						sr.password = "***";
+
+						return $"Method: {r.HttpMethod}" + Environment.NewLine +
+						$"Path: {r.Path}" + Environment.NewLine +
+						$"Body: {JsonConvert.SerializeObject(sr)}";
+					} catch {
+						return $"Method: {r.HttpMethod}" + Environment.NewLine +
+						$"Path: {r.Path}" + Environment.NewLine +
+						$"Body: PRIVATE";
+					}
+				}
+			}
 			return $"Method: {r.HttpMethod}" + Environment.NewLine +
 				$"Path: {r.Path}" + Environment.NewLine +
 				$"Body: {r.Body}";
@@ -613,7 +629,7 @@ namespace StableAPIHandler {
 				try {
 					sr.TrimAll();
 
-					if(sr.version != "1.0" || !sr.resume.HasValue) {
+					if(sr.version != "1.1" || !sr.resume.HasValue) {
 						//Send error with HTTP 200 for backwards compatability until next year
 
 						return new StableAPIResponse() {
@@ -1156,6 +1172,7 @@ namespace StableAPIHandler {
 			string q;
 			//check the count if not ignoring
 			long count = 0;
+			long totalCount = 0;
 			if(!ignoreFull) {
 				q = "SELECT COUNT(`viewers`.`grade_id`) FROM `registrations` JOIN `viewers` ON `viewers`.`viewer_id` = `registrations`.`viewer_id` WHERE "
 					+ " `registrations`.`date`=@date AND `registrations`.`block_id`=@block_id AND `registrations`.`presentation_id`=@presentation_id AND `viewers`.`grade_id`=@g_id;";
@@ -1167,9 +1184,28 @@ namespace StableAPIHandler {
 					cmd.Parameters.AddWithValue("@g_id", v.grade_id);
 					count = (long)cmd.ExecuteScalar();
 				}
+
+				q = "SELECT COUNT(*) FROM `registrations` WHERE `registrations`.`date`=@date AND `registrations`.`block_id`=@block_id AND `registrations`.`presentation_id`=@presentation_id;";
+				using(var cmd = new MySqlCommand(q, dbCon, tx)) {
+					cmd.Prepare();
+					cmd.Parameters.AddWithValue("@date", req.date);
+					cmd.Parameters.AddWithValue("@block_id", req.block_id);
+					cmd.Parameters.AddWithValue("@presentation_id", req.presentation_id);
+					totalCount = (long)cmd.ExecuteScalar();
+				}
+
 				Logger.LogLine("Count by g: " + count);
-				if(count > 8 && req.location_id != 20) {
-					throw new InvalidOperationException("Presentation is full!");
+				Logger.LogLine("Count total: " + totalCount);
+
+				int gradeMax = (req.block_id == 7 || req.block_id == 8) ? 12 : 9;
+				int allMax = (req.block_id == 7 || req.block_id == 8) ? 60 : 50;
+
+				if(req.location_id != 20) {
+					if(count >= gradeMax)
+						throw new InvalidOperationException("Presentation is full!");
+				} else {
+					if(totalCount >= allMax)
+						throw new InvalidOperationException("Presentation is full!");
 				}
 			}
 
