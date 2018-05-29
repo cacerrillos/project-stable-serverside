@@ -12,7 +12,8 @@ namespace ConsoleTools {
 	public class Program {
 		public static void Main(String[] args) {
 			Console.WriteLine("1) Capstone");
-			Console.WriteLine("2) Career Day");
+			Console.WriteLine("2) Capstone Old");
+			Console.WriteLine("3) Career Day");
 			Console.Write("Choice [1]: ");
 
 			string s = Console.ReadLine();
@@ -20,9 +21,12 @@ namespace ConsoleTools {
 			switch(s) {
 				case "":
 				case "1":
-					Capstone.run();
+					Capstone2.run();
 					break;
 				case "2":
+					Capstone.run();
+					break;
+				case "3":
 					CareerDay.run();
 					break;
 				default:

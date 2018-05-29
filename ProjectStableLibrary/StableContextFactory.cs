@@ -187,6 +187,17 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
+		public List<Registration> Registrations {
+			get {
+				var registrations = new List<Registration>();
+
+				foreach (var r in this.registrations.AsNoTracking()) {
+					registrations.Add(r);
+				}
+
+				return registrations;
+			}
+		}
 		public Dictionary<uint, List<Schedule>> FullPresentations {
 			get {
 				var full = new Dictionary<uint, List<Schedule>>();
@@ -228,6 +239,18 @@ namespace ProjectStableLibrary {
 		public DbSet<CoRequisiteMember> CoRequisiteMembers {
 			get;
 			set;
+		}
+
+		public List<CoRequisiteMember> CoRequisiteMembersList {
+			get {
+				var result = new List<CoRequisiteMember>();
+
+				foreach (var c in CoRequisiteMembers.AsNoTracking()) {
+					result.Add(c);
+				}
+
+				return result;
+			}
 		}
 	}
 }
