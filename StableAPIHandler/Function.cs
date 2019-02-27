@@ -550,8 +550,9 @@ namespace StableAPIHandler {
 
 				using(var tx = ctx.Database.BeginTransaction()) {
 					try {
-						var existing = ctx.Attach<E>(obj);
-						ctx.Entry(existing).State = EntityState.Modified;
+//						var existing = ctx.Attach<E>(obj);
+						
+						ctx.Entry(obj).State = EntityState.Modified;
 						int status = ctx.SaveChanges();
 						tx.Commit();
 						return new StableAPIResponse() {

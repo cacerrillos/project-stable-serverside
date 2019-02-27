@@ -17,5 +17,16 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
+		public override bool Equals(object obj) {
+			if(obj.GetType() == typeof(Location)) {
+				Location b = (Location)obj;
+				return location_id == b.location_id && location_name == b.location_name;
+			}
+			return false;
+		}
+
+		public override int GetHashCode() {
+			return HashCode.Combine(location_id, location_name);
+		}
 	}
 }
