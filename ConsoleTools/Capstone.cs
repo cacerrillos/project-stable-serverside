@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace ConsoleTools {
 	public class Capstone {
-		
+		const int Full = 9;
 		public static void run() {
             using(var dbCon = new MySqlConnection(Program.GetConStr())) {
                 dbCon.Open();
@@ -22,7 +22,7 @@ namespace ConsoleTools {
         }
         static void A(MySqlConnection dbCon) {
             var pres_grade = new Dictionary<uint, uint>();
-            var data = new Dictionary<uint, Dictionary<uint, uint>>();
+            var data = new Dictionary<uint, Dictionary<string, uint>>();
             var pres = new List<uint>();
             var presC = new Dictionary<uint, uint>();
             var presBlock = new Dictionary<uint, uint>();
@@ -34,7 +34,7 @@ namespace ConsoleTools {
                     uint viewer_id;
                     while(r.Read()) {
                         viewer_id = r.GetUInt32("viewer_id");
-                        data.Add(viewer_id, new Dictionary<uint, uint>());
+                        data.Add(viewer_id, new Dictionary<string, uint>());
                         pres_grade.Add(viewer_id, r.GetUInt32("grade_id"));
                     }
                 }
@@ -42,17 +42,18 @@ namespace ConsoleTools {
 
             Console.WriteLine($"Viewer count: {data.Count}");
 
-            q = "SELECT `viewer_id`, `block_id`, `presentation_id` FROM `registrations`;";
+            q = "SELECT `viewer_id`,`date`, `block_id`, `presentation_id` FROM `registrations`;";
             using(var cmd = new MySqlCommand(q, dbCon)) {
                 using(var r = cmd.ExecuteReader()) {
                     while(r.Read()) {
-                        data[r.GetUInt32("viewer_id")].Add(r.GetUInt32("block_id"), r.GetUInt32("presentation_id"));
+                        data[r.GetUInt32("viewer_id")].Add(r.GetUInt32("date") + "_" + r.GetUInt32("block_id"), r.GetUInt32("presentation_id"));
                     }
                 }
             }
+			
             int regCount = data.Sum(thus => thus.Value.Count);
-            int expected = data.Count * 8;
-            int partial = data.Where(thus => thus.Value.Count < 8).Count();
+            int expected = data.Count * Full;
+            int partial = data.Where(thus => thus.Value.Count < Full).Count();
 
             Console.WriteLine($"Registration Count: {regCount} Expected: {expected} ({((double)regCount/expected)} %) Partial Count: {partial}");
 
@@ -76,32 +77,41 @@ namespace ConsoleTools {
             }
             var toAdd = new List<Entry>();
             var toRemove = new List<Entry>();
+			List<uint> toSkip = new List<uint>() {
+				132,39,32,96,74,99
+			};
             foreach(var g in pres_grade.OrderByDescending(thus => thus.Value)) {
-                if(data[g.Key].Count < 8) {
+                if(data[g.Key].Count < Full) {
                     //missing pres
 
                     for(uint x = 1; x <= 8; x++) {
-                        if(!data[g.Key].ContainsKey(x)) {
+                        if(!data[g.Key].ContainsKey("20180531" + "_" + x)) {
                             var pres_in_block = presBlock.Where(thus => thus.Value == x);
                             var pres_by_count = presC.Where(thus => pres_in_block.Any(t => thus.Key == t.Key) && thus.Value < 37).OrderBy(thus => thus.Value);
                             Console.WriteLine($"Block {x} Possible: " + string.Join(", ", pres_by_count.Select( thus => thus.Key +"C"+thus.Value)));
                             try {
                                 uint p_to_add = pres_by_count.First().Key;
-                                if(p_to_add == 77 || p_to_add == 78) {
-                                    presC[77]++;
-                                    presC[78]++;
+
+								if (toSkip.Contains(p_to_add)) {
+									throw new Exception();
+								}
+
+								/*
+                                if(p_to_add == 39 || p_to_add == 132) {
+                                    presC[39]++;
+                                    presC[132]++;
                                     toAdd.Add(new Entry() {
-                                        date = 20170601,
-                                        block_id = 7,
+                                        date = 20180601,
+                                        block_id = 2,
                                         viewer_id = g.Key,
-                                        presentation_id = 77
+                                        presentation_id = 132
                                     });
                                     
                                     toAdd.Add(new Entry() {
-                                        date = 20170601,
-                                        block_id = 8,
+                                        date = 20180601,
+                                        block_id = 1,
                                         viewer_id = g.Key,
-                                        presentation_id = 78
+                                        presentation_id = 39
                                     });
                                     if(!data[g.Key].ContainsKey(7))
                                         data[g.Key].Add(7, 77);
@@ -173,6 +183,8 @@ namespace ConsoleTools {
                                     }
                                     continue;
                                 }
+								*/
+
                                 //increas count
                                 presC[p_to_add]++;
                                 toAdd.Add(new Entry() {
