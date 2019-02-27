@@ -43,6 +43,12 @@ namespace ProjectStableLibrary {
 			modelBuilder.Entity<CoRequisiteMember>()
 				.ToTable("corequisite_members");
 
+			modelBuilder.Entity<Location>()
+				.ToTable("locations");
+
+			modelBuilder.Entity<House>()
+				.ToTable("houses");
+
 			modelBuilder.Entity<CoRequisiteMember>()
 				.HasKey(c => new {
 					c.group_id,
