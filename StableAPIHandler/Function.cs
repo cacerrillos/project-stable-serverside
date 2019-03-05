@@ -873,7 +873,8 @@ namespace StableAPIHandler {
 				req.status = true;
 
 				try {
-					if(ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key && !thus.Saved()) != 1)
+					//&& !thus.Saved()
+					if(ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1)
 						return new StableAPIResponse() {
 							Body = "{}",
 							StatusCode = HttpStatusCode.Unauthorized
@@ -888,6 +889,14 @@ namespace StableAPIHandler {
 					}
 					using(var tx = ctx.Database.BeginTransaction()) {
 						try {
+							if(ctx.preferences.Any(thus =>  thus.viewer_id == req.viewer_id)) {
+								List<Preference> toRemove = new List<Preference>();
+								toRemove.AddRange(ctx.preferences.Where(thus => thus.viewer_id == req.viewer_id));
+								foreach(var p in toRemove) {
+									ctx.preferences.Remove(p);
+								}
+								ctx.SaveChanges();
+							}
 							foreach(Preference p in toAdd) {
 								ctx.preferences.Add(p);
 							}
