@@ -9,15 +9,16 @@
     "profile"     : "default",
     "region"      : "us-east-2",
     "configuration" : "Release",
-    "framework"     : "netcoreapp2.0",
-    "function-runtime" : "dotnetcore2.0",
-    "function-memory-size" : 1024,
-    "function-timeout"     : 30,
+    "framework"     : "netcoreapp2.1",
+    "function-runtime" : "dotnetcore2.1",
+    "function-memory-size" : 512,
+    "function-timeout"     : 15,
     "function-handler"     : "StableAPIHandler::StableAPIHandler.Function::TryFunctionHandler",
-    "function-name"        : "EndearingOtter",
+    "function-name"        : "VeryAmbiguousPenguin",
     "function-role"        : "arn:aws:iam::056481398114:role/projectstable_lambda",
     "function-subnets"     : "subnet-a99820c1,subnet-b456a6ce,subnet-b41831f9",
-    "function-security-groups" : "sg-3560f45e,sg-5a6df931,sg-8d0296e6",
+    "function-security-groups" : "sg-5a6df931,sg-8d0296e6",
     "environment-variables"    : "",
-    "tracing-mode"             : "PassThrough"
+    "tracing-mode"             : "PassThrough",
+    "function-description"     : ""
 }

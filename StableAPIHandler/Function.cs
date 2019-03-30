@@ -630,7 +630,7 @@ namespace StableAPIHandler {
 				try {
 					sr.TrimAll();
 
-					if(sr.version != "1.1" || !sr.resume.HasValue) {
+					if(sr.version != "2.0" || !sr.resume.HasValue) {
 						//Send error with HTTP 200 for backwards compatability until next year
 
 						return new StableAPIResponse() {
