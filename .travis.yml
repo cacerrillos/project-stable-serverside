@@ -2,7 +2,7 @@ language: csharp
 dist: trusty
 sudo: required
 mono: none
-dotnet: 2.2.3
+dotnet: 2.2
 solution: Project\ Stable.sln
 before_script:
   - dotnet restore
