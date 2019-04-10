@@ -27,6 +27,9 @@ namespace StableAPIHandler {
 		/// <returns></returns>
 		///
 		ILambdaLogger Logger;
+		const uint FirstBlockID = 1;
+		const uint FirstBlockAfterLunchID = 5;
+		const uint PrepPresentationId = 167;
 		public static string GetEnvironmentVariable(string variable) {
 			try {
 				string r = Environment.GetEnvironmentVariable(variable);
@@ -86,16 +89,38 @@ namespace StableAPIHandler {
 			return $"Status: {r.StatusCode}" + Environment.NewLine +
 				$"Body: {r.Body}";
 		}
+		Dictionary<uint, DateTime> enableTimes = new Dictionary<uint, DateTime>() {
+			{4, new DateTime(2019,04,10,20,00,00, DateTimeKind.Utc) },
+			{3, new DateTime(2019,04,11,20,00,00, DateTimeKind.Utc) },
+			{2, new DateTime(2019,04,12,20,00,00, DateTimeKind.Utc) },
+			{1, new DateTime(2019,04,12,20,00,00, DateTimeKind.Utc) },
+		};
+		bool CheckEnabled(uint grade = 0) {
+			bool enabled = bool.Parse(GetEnvironmentVariable("enabled"));
+
+			if(grade == 0)
+				return enabled;
+
+			DateTime now = DateTime.UtcNow;
+
+			if(!enableTimes.ContainsKey(grade))
+				return false;
+
+			DateTime enableTime = enableTimes[grade];
+
+			return enabled && now >= enableTime;
+		}
+		APIGatewayProxyResponse noSignups = new APIGatewayProxyResponse() {
+			Body = "{}",
+			Headers = new Dictionary<string, string>() { { "access-control-allow-origin", GetEnvironmentVariable("SITE_DOMAIN") } },
+			StatusCode = 418
+		};
 		public APIGatewayProxyResponse FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context) {
 			Logger = context.Logger;
 			object resultObject = new object();
 			int resultCode = 405;
 
-			var noSignups = new APIGatewayProxyResponse() {
-				Body = "{}",
-				Headers = new Dictionary<string, string>() { { "access-control-allow-origin", GetEnvironmentVariable("SITE_DOMAIN") } },
-				StatusCode = 418
-			};
+			
 			bool enabled = bool.Parse(GetEnvironmentVariable("enabled"));
 
 			bool freeforall = false;
@@ -115,6 +140,16 @@ namespace StableAPIHandler {
 				case "/":
 					return new StableAPIResponse {
 						Body = "What are you doing here?",
+						StatusCode = HttpStatusCode.OK
+					};
+				case "/enabletimes":
+				case "/enabletimes/":
+					return new StableAPIResponse {
+						Body = JsonConvert.SerializeObject(enableTimes.AsEnumerable().Append(new KeyValuePair<uint, DateTime>(0, DateTime.UtcNow)))
+						+ Environment.NewLine + CheckEnabled(1).ToString()
+						+ Environment.NewLine + CheckEnabled(2).ToString()
+						+ Environment.NewLine + CheckEnabled(3).ToString()
+						+ Environment.NewLine + CheckEnabled(4).ToString(),
 						StatusCode = HttpStatusCode.OK
 					};
 				case "/status":
@@ -379,6 +414,10 @@ namespace StableAPIHandler {
 							case "/presentations/":
 								response = HandlePOST<Presentation>(apigProxyEvent, ctx);
 								break;
+							case "/schedule":
+							case "/schedule/":
+								response = HandlePOST<Schedule>(apigProxyEvent, ctx);
+								break;
 							case "/viewers":
 							case "/viewers/":
 								//response = HandlePOST<Viewer>(apigProxyEvent, ctx);
@@ -475,6 +514,10 @@ namespace StableAPIHandler {
 							case "/presentations":
 							case "/presentations/":
 								response = HandleDELETE<Presentation>(apigProxyEvent, ctx);
+								break;
+							case "/schedule":
+							case "/schedule/":
+								response = HandleDELETE<Schedule>(apigProxyEvent, ctx);
 								break;
 							case "/viewers":
 							case "/viewers/":
@@ -624,6 +667,7 @@ namespace StableAPIHandler {
 				return StableAPIResponse.BadRequest(e);
 			}
 		}
+		//preferences array
 		private StableAPIResponse startSignup(APIGatewayProxyRequest request, StableContext ctx, string conStr) {
 			try {
 				SignupRequest sr = JsonConvert.DeserializeObject<SignupRequest>(request.Body);
@@ -719,6 +763,9 @@ namespace StableAPIHandler {
 						password = SecurePasswordHasher.Hash(sr.password)
 					};
 
+					if(!CheckEnabled(v.grade_id))
+						return StableAPIResponse.NoSignups;
+
 					if (v.first_name.Length == 0 || v.last_name.Length == 0) {
 						return new StableAPIResponse() {
 							Body = JsonConvert.SerializeObject(new Result() {
@@ -731,7 +778,7 @@ namespace StableAPIHandler {
 					}
 
 					Presentation p = null;
-					Schedule p_s = null;
+					Schedule presentationSenior = null;
 
 					Presentation pre_presentation = null;
 					Schedule pre_schedule = null;
@@ -742,7 +789,7 @@ namespace StableAPIHandler {
 					if(sr.reserved != -1 && sr.grade == 4) {
 						p = ctx.presentations.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == sr.reserved);
 						uint block_id = uint.MaxValue;
-						p_s = ctx.schedule.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == sr.reserved);
+						presentationSenior = ctx.schedule.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == sr.reserved);
 
 						var main_co = ctx.CoRequisiteMembers.AsNoTracking().FirstOrDefault(thus => thus.p_id == p.presentation_id);
 						if(main_co != null) {
@@ -756,13 +803,18 @@ namespace StableAPIHandler {
 
 
 
-						if(p_s.block_id != 1 && p_s.block_id != 7) { // Find previous presentation at the same location
-							var possiblePres = ctx.schedule.AsNoTracking().Where(thus => thus.date == p_s.date && thus.block_id == (p_s.block_id - 1)).Select(thus => thus.presentation_id);
-							var found = ctx.presentations.AsNoTracking().Where(thus => thus.location_id == p.location_id && possiblePres.Contains(thus.presentation_id));
+						if(presentationSenior.block_id != FirstBlockID && presentationSenior.block_id != FirstBlockAfterLunchID) { // Find previous presentation at the same location
+							var found = ctx.schedule.AsNoTracking().Where(
+									thus => thus.date == presentationSenior.date
+									&& thus.block_id == (presentationSenior.block_id - 1)
+									&& thus.location_id == presentationSenior.location_id
+								);
+
+
 
 							if(found.Count() == 1) {
-								pre_presentation = found.First();
-								pre_schedule = ctx.schedule.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == pre_presentation.presentation_id);
+								pre_schedule = found.First();
+								pre_presentation = ctx.presentations.AsNoTracking().FirstOrDefault(thus => thus.presentation_id == pre_schedule.presentation_id);
 
 								
 								var main_co_2 = ctx.CoRequisiteMembers.AsNoTracking().FirstOrDefault(thus => thus.p_id == pre_presentation.presentation_id);
@@ -787,18 +839,18 @@ namespace StableAPIHandler {
 							ctx.SaveChanges();
 							tx.Commit();
 							if(p != null) {
-								if(p_s == null)
+								if(presentationSenior == null)
 									throw new Exception($"Schedule not found for presentation! [{p.presentation_id}]");
 								try {
 									using(var dbCon = new MySqlConnection(conStr)) {
 										dbCon.Open();
 										Register(dbCon, v, new RegistrationRequest() {
-											date = p_s.date,
-											block_id = p_s.block_id,
+											date = presentationSenior.date,
+											block_id = presentationSenior.block_id,
 											presentation_id = p.presentation_id,
 											viewer_id = v.viewer_id,
 											viewer_key = v.viewer_key,
-											location_id = p.location_id
+											location_id = presentationSenior.location_id
 										}, true);
 
 										if(pre_presentation != null && pre_schedule != null) {
@@ -808,7 +860,7 @@ namespace StableAPIHandler {
 												presentation_id = pre_presentation.presentation_id,
 												viewer_id = v.viewer_id,
 												viewer_key = v.viewer_key,
-												location_id = pre_presentation.location_id
+												location_id = pre_schedule.location_id
 											}, true);
 
 										}
@@ -827,7 +879,7 @@ namespace StableAPIHandler {
 												presentation_id = o.Key.presentation_id,
 												viewer_id = v.viewer_id,
 												viewer_key = v.viewer_key,
-												location_id = o.Key.location_id
+												location_id = o.Value.location_id
 											}, true);
 										}
 									}
@@ -867,6 +919,7 @@ namespace StableAPIHandler {
 				return StableAPIResponse.BadRequest(e);
 			}
 		}
+		//preferences array
 		private StableAPIResponse finishSignup(APIGatewayProxyRequest apigProxyEvent, StableContext ctx, ILambdaContext context) {
 			try {
 				var req = JsonConvert.DeserializeObject<FinishSignupRequest>(apigProxyEvent.Body);
@@ -979,7 +1032,8 @@ namespace StableAPIHandler {
 		private string PrintPres(uint pres_id, StableContext ctx) {
 			try {
 				var presentation = ctx.presentations.First(thus => thus.presentation_id == pres_id);
-				var location = ctx.locations.First(thus => thus.location_id == presentation.location_id);
+				var schedule = ctx.schedule.First(thus => thus.presentation_id == pres_id);
+				var location = ctx.locations.First(thus => thus.location_id == schedule.location_id);
 				var blocks = ctx.Blocks;
 				var grades = ctx.Grades;
 				var houses = ctx.Houses;
@@ -1016,6 +1070,7 @@ namespace StableAPIHandler {
 				throw;
 			}
 		}
+		//Free for all
 		private StableAPIResponse handleRegister(APIGatewayProxyRequest request, StableContext ctx, string conStr) {
 			try {
 				var req = JsonConvert.DeserializeObject<RegistrationRequest>(request.Body);
@@ -1023,6 +1078,7 @@ namespace StableAPIHandler {
 					if(ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.viewer_key == req.viewer_key) != 1) {
 						return StableAPIResponse.Unauthorized;
 					}
+
 					//disable for login
 					if(false && ctx.viewers.AsNoTracking().Count(thus => thus.viewer_id == req.viewer_id && thus.Saved()) == 1) {
 						return new StableAPIResponse() {
@@ -1041,17 +1097,21 @@ namespace StableAPIHandler {
 					if (ctx.schedule.AsNoTracking().Count(thus => thus.date == req.date && thus.block_id == req.block_id && thus.presentation_id == req.presentation_id) != 1)
 						return StableAPIResponse.BadRequest(new Exception("Presentation instance not found!"));
 
-					var presentation = ctx.presentations.AsNoTracking().First(thus => thus.presentation_id == req.presentation_id);
-					req.location_id = presentation.location_id;
+					//var presentation = ctx.presentations.AsNoTracking().First(thus => thus.presentation_id == req.presentation_id);
+					//req.location_id = presentation.location_id;
 
 					Viewer v = ctx.viewers.AsNoTracking().FirstOrDefault(thus => thus.viewer_id == req.viewer_id);
+
+					if(!CheckEnabled(v.grade_id))
+						return StableAPIResponse.NoSignups;
+
 
 					//attempt to update presentations
 					try {
 						using(MySqlConnection dbCon = new MySqlConnection(conStr)) {
 							dbCon.Open();
 
-							if(req.presentation_id >= 142)
+							if(req.presentation_id == PrepPresentationId)
 								throw new Exception("Locked Presentation!");
 							Register(dbCon, v, req);
 						}
@@ -1082,6 +1142,8 @@ namespace StableAPIHandler {
 				return StableAPIResponse.BadRequest(e);
 			}
 		}
+
+		//free for all
 		private void Register(MySqlConnection dbCon, Viewer v, RegistrationRequest req, bool ignoreFull = false) {
 			List<RegistrationRequest> reqs = new List<RegistrationRequest>();
 			reqs.Add(req);
@@ -1118,7 +1180,7 @@ namespace StableAPIHandler {
 
 				Logger.LogLine($"PSSOSOS: {string.Join(", ", ids)}");
 
-				q = "SELECT `date`, `block_id`, `presentation_id` FROM `schedule` WHERE `presentation_id` IN (" + string.Join(",", ids) + ");";
+				q = "SELECT `date`, `block_id`, `presentation_id`, `location_id` FROM `schedule` WHERE `presentation_id` IN (" + string.Join(",", ids) + ");";
 
 				List<Schedule> schedules = new List<Schedule>();
 
@@ -1128,14 +1190,15 @@ namespace StableAPIHandler {
 							schedules.Add(new Schedule() {
 								date = r.GetUInt32("date"),
 								block_id = r.GetUInt32("block_id"),
-								presentation_id = r.GetUInt32("presentation_id")
+								presentation_id = r.GetUInt32("presentation_id"),
+								location_id = r.GetUInt32("location_id")
 							});
 						}
 					}
 				}
 
-					//get presentation info for each id to add, including coreqs
-					q = "SELECT `presentation_id`, `location_id` FROM `presentations` WHERE `presentation_id` IN (" + string.Join(",", ids) + ");";
+				//get presentation info for each id to add, including coreqs
+				q = "SELECT `presentation_id` FROM `presentations` WHERE `presentation_id` IN (" + string.Join(",", ids) + ");";
 
 				
 
@@ -1155,7 +1218,7 @@ namespace StableAPIHandler {
 								presentation_id = p_id,
 								viewer_id = req.viewer_id,
 								viewer_key = req.viewer_key,
-								location_id = r.GetUInt32("location_id")
+								location_id = sch.location_id
 							});
 						}
 					}
@@ -1178,6 +1241,7 @@ namespace StableAPIHandler {
 			}
 
 		}
+		const uint LocationId_MPR = 20;
 		private void RegisterInternal(MySqlConnection dbCon, MySqlTransaction tx, Viewer v, RegistrationRequest req, bool ignoreFull) {
 			string q;
 			//check the count if not ignoring
@@ -1207,16 +1271,16 @@ namespace StableAPIHandler {
 				Logger.LogLine("Count by g: " + count);
 				Logger.LogLine("Count total: " + totalCount);
 
-				int gradeMax = (req.block_id == 7 || req.block_id == 8) ? 12 : 9;
-				int allMax = (req.block_id == 7 || req.block_id == 8) ? 60 : 50;
+				int maxViewersPerGrade = v.grade_id == 4 ? 17 : 12;
+				int maxTotal = req.location_id == LocationId_MPR ? 38 : 32;
 
-				if(req.location_id != 20) {
-					if(count >= gradeMax)
-						throw new InvalidOperationException("Presentation is full!");
-				} else {
-					if(totalCount >= allMax)
-						throw new InvalidOperationException("Presentation is full!");
-				}
+				
+
+
+
+				if(count > maxViewersPerGrade || totalCount > maxTotal)
+					throw new InvalidOperationException("Presentation is full!");
+				
 			}
 
 			Logger.LogLine($"Req: {req.ToString()}");
@@ -1260,7 +1324,7 @@ namespace StableAPIHandler {
 
 			toRemove.Add(existingPresentation.Value);
 
-			if(existingPresentation.Value >= 142)
+			if(existingPresentation.Value == PrepPresentationId)
 				throw new Exception("PREP Required!");
 
 			//Check if it has coreqs
@@ -1379,6 +1443,14 @@ namespace StableAPIHandler {
 				return new StableAPIResponse() {
 					Body = "{}",
 					StatusCode = HttpStatusCode.Unauthorized
+				};
+			}
+		}
+		public static StableAPIResponse NoSignups {
+			get {
+				return new StableAPIResponse() {
+					Body = "{}",
+					StatusCode = (HttpStatusCode)418
 				};
 			}
 		}

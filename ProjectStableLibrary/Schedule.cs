@@ -8,16 +8,21 @@ namespace ProjectStableLibrary {
 	[Table("schedule")]
 	public class Schedule {
 		[Key, Column(Order = 1)]
-		public uint date {
+		public uint location_id {
 			get;
 			set;
 		}
 		[Key, Column(Order = 2)]
-		public uint block_id {
+		public uint date {
 			get;
 			set;
 		}
 		[Key, Column(Order = 3)]
+		public uint block_id {
+			get;
+			set;
+		}
+		[Key, Column(Order = 4)]
 		public uint presentation_id {
 			get;
 			set;
@@ -30,27 +35,15 @@ namespace ProjectStableLibrary {
 			if(s == null)
 				return false;
 			
-			return date == s.date && block_id == s.block_id && presentation_id == s.presentation_id;
+			return location_id == s.location_id && date == s.date && block_id == s.block_id && presentation_id == s.presentation_id;
 		}
 
 		public override int GetHashCode() {
-			unchecked {
-				int result = 37;
-
-				result *= 397;
-				result += date.GetHashCode();
-
-				result *= 397;
-				result += block_id.GetHashCode();
-
-				result *= 397;
-				result += presentation_id.GetHashCode();
-
-				return result;
-			}
+			return HashCode.Combine(location_id, date, block_id, presentation_id);
 		}
+
 		public override string ToString() {
-			return date + "_" + block_id + "_" + presentation_id;
+			return location_id + "_" + date + "_" + block_id + "_" + presentation_id;
 		}
 	}
 }

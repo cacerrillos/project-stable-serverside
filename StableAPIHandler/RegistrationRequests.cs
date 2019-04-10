@@ -53,7 +53,7 @@ namespace StableAPIHandler {
 				presentation_id = p_id,
 				viewer_id = v_id,
 				viewer_key = v_key,
-				location_id = p.location_id
+				location_id = p_s.location_id
 			};
 		}
 	}

@@ -27,10 +27,6 @@ namespace ProjectStableLibrary {
 			get;
 			set;
 		}
-		public uint location_id {
-			get;
-			set;
-		}
 		public string bio {
 			get;
 			set;

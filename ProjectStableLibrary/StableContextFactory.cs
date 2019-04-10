@@ -222,7 +222,7 @@ namespace ProjectStableLibrary {
 						int gradeMax = (s.block_id == 7 || s.block_id == 8) ? 12 : 9;
 						int allMax = (s.block_id == 7 || s.block_id == 8) ? 60 : 50;
 
-						if(presentation.location_id == 20) {
+						if(s.location_id == 20) { //MPR check
 							if(reg.Count(thus => thus.Schedule().Equals(s)) >= allMax) {
 								full[g.grade_id].Add(s);
 							}
