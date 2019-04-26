@@ -10,10 +10,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ConsoleTools {
 	public class Capstone2 {
-		public const int date = 20180316;
 		private static bool prioritizeByGrade = true;
+		const uint FirstBlockID = 1;
+		const uint FirstBlockAfterLunchID = 5;
+		const uint PrepPresentationId = 167;
+		const uint LocationId_MPR = 20;
+
 		public static void run() {
-			bool careerDay = false;
 			string s;
 			char c;
 			do {
@@ -50,7 +53,8 @@ namespace ConsoleTools {
 				var viewers = ctx.Viewers;
 				Console.WriteLine($"Fetched {viewers.Count} viewers");
 
-				var schedule = ctx.Schedule.Where(thus => thus.presentation_id < 142).ToList(); //ignore prep
+				var schedule = ctx.Schedule;
+				schedule = schedule.Where(thus => thus.presentation_id != PrepPresentationId).ToList(); //ignore prep
 
 				var dates = ctx.Dates;
 				Console.WriteLine($"Fetched {dates.Count} dates");
@@ -81,52 +85,12 @@ namespace ConsoleTools {
 				var coreqs = ctx.CoRequisiteMembersList;
 
 
-				if(false) {
-					string s;
-					char c;
-					do {
-						Console.Write("Prioritize by grade? (y/n): ");
-						s = Console.ReadLine().ToUpper();
-						if (s.Length > 0) {
-							c = s[0];
-							if (c == 'Y' || c == 'N') {
-								prioritizeByGrade = c == 'Y';
-								break;
-							}
-						} else {
-							c = ' ';
-						}
-					} while (true);
-				}
-
-				if (false) {
-					uint max_viewers = 36;
-
-					do {
-						try {
-							Console.Write($"max_viewers [{max_viewers}]: ");
-							string s = Console.ReadLine();
-							if (s.Length == 0)
-								break;
-
-							max_viewers = uint.Parse(s);
-							break;
-						} catch {
-							Console.WriteLine("Invalid input!");
-						}
-					} while (true);
-				}
-
-
 
 				DateTime start = DateTime.Now;
 
 				//foreach schedule (date, block)
 				//get viewers that aren't signed up for this block
 				//loop over those viewrs, each time place them in the least filled presentation
-				List<uint> mpr = new List<uint>() {
-					36,64,74,99,100,115,120,122,131,133,148
-				};
 
 				foreach(var date in dates) {
 					foreach(var block in blocks) {
@@ -135,7 +99,7 @@ namespace ConsoleTools {
 							block_id = block.Key
 						};
 
-						if (date.date == 20180601 && block.Key > 2)
+						if (date.date == 20190503 && block.Key > 2)
 							continue;
 
 						List<uint> unregistered = GetUnRegistered(date, block.Value, viewers, currentRegistrations, newRegistrations);
@@ -148,16 +112,12 @@ namespace ConsoleTools {
 
 							bool added = false;
 							foreach (var p in pres) {
-								int size = capacityCheck[p.Key];
+								int current_size = capacityCheck[p.Key];
 
-								if (mpr.Contains(p.Key.presentation_id)) {
-									if (capacityCheck[p.Key] >= 80)
-										continue;
-								} else {
-									int cap = (s.block_id == 7 || s.block_id == 8) ? 48 : 36;
-									if (capacityCheck[p.Key] >= cap)
-										continue;
-								}
+								int cap = p.Key.location_id == LocationId_MPR ? 38 : 32;
+
+								if(current_size >= cap)
+									continue;
 								
 								
 								//attempt to add to
@@ -270,112 +230,11 @@ namespace ConsoleTools {
 
 					}
 				}
-				/*
-				foreach (uint g in grade_pri) {
-					// if(g != 3)
-					// 	continue;
-					var viewers_to_proc = new List<uint>();
-
-					if (prioritizeByGrade)
-						viewers_to_proc.AddRange(from thus in viewers where thus.Value.grade_id == g select thus.Value.viewer_id);
-					else
-						viewers_to_proc.AddRange(from thus in viewers select thus.Value.viewer_id);
-
-					viewers_to_proc.Randomize();
-
-					foreach (uint v in viewers_to_proc) {
-						var bleh = new List<Tuple<uint, uint>>();
-						var bleh_v = new List<uint>();
-						var v_pref = (from thus in preferences where thus.viewer_id == v orderby thus.order select thus.presentation_id).ToList();
-
-						bool randomize = v_pref.Count < presentations.Count;
-
-
-						var temp_s = new Schedule() { date = date };
-						var blocks_r = blocks.Values.ToList();
-
-						int error_count = 0;
-						do {
-
-							blocks_r.Randomize();
-							foreach (Block b in blocks_r) {
-								temp_s.block_id = b.block_id;
-
-								if (randomize) {
-									var r_p = from thus in capacityCheck orderby thus.Value select thus.Key.presentation_id;
-
-									foreach (uint p in r_p) {
-										if (bleh_v.Contains(p))
-											continue;
-										temp_s.presentation_id = p;
-										if (!capacityCheck.ContainsKey(temp_s))
-											continue;
-										if (capacityCheck[temp_s] >= max_viewers)
-											continue;
-										capacityCheck[temp_s]++;
-										bleh.Add(new Tuple<uint, uint>(b.block_id, p));
-										bleh_v.Add(p);
-										break;
-									}
-									continue;
-								}
-
-								foreach (uint p in v_pref) {
-									if (bleh_v.Contains(p))
-										continue;
-									temp_s.presentation_id = p;
-									if (!capacityCheck.ContainsKey(temp_s))
-										continue;
-									if (capacityCheck[temp_s] >= max_viewers)
-										continue;
-									capacityCheck[temp_s]++;
-									bleh.Add(new Tuple<uint, uint>(b.block_id, p));
-									bleh_v.Add(p);
-									break;
-								}
-
-							}
-							if (bleh_v.Count != expected_count) {
-								//Console.WriteLine("ERROR " + string.Join(", ", bleh_v));
-
-								//undo
-								foreach (var toRemove in bleh) {
-									temp_s.block_id = toRemove.Item1;
-									temp_s.presentation_id = toRemove.Item2;
-									capacityCheck[temp_s]--;
-								}
-								bleh.Clear();
-								bleh_v.Clear();
-								error_count++;
-								if (error_count > retry_count) {
-									clean = false;
-									break;
-								}
-
-							} else {
-								foreach (var toAdd in bleh) {
-									newRegistrations.Add(new Registration() {
-										date = temp_s.date,
-										block_id = toAdd.Item1,
-										presentation_id = toAdd.Item2,
-										viewer_id = v
-									});
-								}
-							}
-						} while (bleh_v.Count != expected_count);
-
-						//var rng = randomize ? "RNG" : "";
-						//Console.WriteLine($"Student: {v} {rng} {string.Join(", ", bleh)}");
-					}
-
-
-				}
-				*/
 
 				//sanity check
 				foreach(var v in viewers.Values) {
 					int vC = currentRegistrations.Concat(newRegistrations).Count(thus => thus.viewer_id == v.viewer_id);
-					if (vC != 10) {
+					if (vC != 8) {
 						Console.WriteLine($"Error, {v.viewer_id} {vC}");
 					}
 
@@ -388,7 +247,7 @@ namespace ConsoleTools {
 				if (saveToDB) {
 					start = DateTime.Now;
 
-					if (clean) {
+					if (clean && false) {
 						using (var tx = ctx.Database.BeginTransaction()) {
 							try {
 								ctx.Database.ExecuteSqlCommand("DELETE FROM `registrations`;");
