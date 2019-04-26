@@ -1011,10 +1011,20 @@ namespace StableAPIHandler {
 					StatusCode = HttpStatusCode.OK,
 
 				};
+				if(pres_id == PrepPresentationId) {
+					return new StableAPIResponse() {
+						Body = "Cannot fetch Prep presentation schedule",
+						StatusCode = HttpStatusCode.BadRequest
+					};
+				}
 				if(pres_id == 0) {
-					var p = ctx.Presentations;
-					foreach(var k in p) {
-						res.Body += PrintPres(k.Key, ctx);
+					var schedule = ctx.Schedule;
+
+					foreach(var k in schedule.OrderBy(thus => thus.location_id).ThenBy(thus => thus.date).ThenBy(thus => thus.block_id)) {
+						if(k.presentation_id == PrepPresentationId)
+							continue;
+
+						res.Body += PrintPres(k.presentation_id, ctx);
 					}
 				} else {
 					res.Body = PrintPres(pres_id, ctx);
@@ -1051,7 +1061,10 @@ namespace StableAPIHandler {
 
 					var viewers_with_data = ctx.viewers.Where(thus => viewers_in_pres.Contains(thus.viewer_id)).ToList();
 					foreach(Registration r in temp) {
-						viewers[r.Schedule()].Add(viewers_with_data.First(thus => thus.viewer_id == r.viewer_id));
+						var temp_schedule = r.Schedule();
+						temp_schedule.location_id = location.location_id;
+
+						viewers[temp_schedule].Add(viewers_with_data.First(thus => thus.viewer_id == r.viewer_id));
 					}
 				}
 

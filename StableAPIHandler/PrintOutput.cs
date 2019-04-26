@@ -40,7 +40,7 @@ namespace StableAPIHandler {
 				if(!viewers.ContainsKey(s))
 					continue;
 
-				response += "<h4>" + presentationData.ToString() + " | " + locationData.location_name + " | " + blocks[s.block_id].block_name + "</h4>";
+				response += "<h4>" + presentationData.ToString() + " | " + locationData.location_name + " | " + s.date + " | " + blocks[s.block_id].block_name + "</h4>";
 				response += $"<div>Viewer count: <b>{viewers[s].Count}</b></div>";
 				response += "<table>";
 				response += "<tr><th>Last</th><th>First</th>";
