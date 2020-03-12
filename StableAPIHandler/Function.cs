@@ -274,7 +274,7 @@ namespace StableAPIHandler {
 										try {
 											uint viewer_id = uint.Parse(apigProxyEvent.QueryStringParameters["viewer_id"]);
 											response = new StableAPIResponse() {
-												Body = JsonConvert.SerializeObject(ctx.viewers.AsNoTracking().First(thus => thus.viewer_id == viewer_id)),
+												Body = JsonConvert.SerializeObject(ctx.viewers.AsNoTracking().First(thus => thus.viewer_id == viewer_id).Sanitize()),
 												StatusCode = HttpStatusCode.OK
 											};
 										} catch(Exception e) {
